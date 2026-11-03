@@ -11,8 +11,9 @@ jobs:
     steps:
       - name: Consultar o banco
         run: |
-          code=$(curl -s -o /dev/null -w '%{http_code}' \
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
             -H "apikey: sb_publishable_zg_rPvJ15I_wbaFZ2qemeg_Xnsalgsh" \
-            "https://ksucnjrmcagzepxahync.supabase.co/rest/v1/campaigns?select=id&limit=1")
+            -H "Content-Type: application/json" -d '{}' \
+            "https://ksucnjrmcagzepxahync.supabase.co/rest/v1/rpc/ping")
           echo "Resposta do Supabase: $code"
           test "$code" = "200"
