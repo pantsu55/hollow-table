@@ -1131,7 +1131,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.58';
+  const APP_VER = '0.59';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -1516,7 +1516,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       return true;
     } catch (e) { return false; }
   }
-  const ambUrl = {}, blobUrl = {};
+  const ambUrl = {}, blobUrl = {}, ambErr = {};
   async function sbHydrate(sc) {
     sc = sc || S;
     if (!sbUser()) return;
@@ -1530,7 +1530,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     for (const c of sc.cues) {
       /* ambientes longos tocam direto do arquivo (sem decodificar tudo na memória, o que trava no iPad) */
       if (c.src === 'file' && c.path && c.kind === 'amb' && !fileBuffers[c.id]) {
-        if (!ambUrl[c.id]) { try { ambUrl[c.id] = blobUrl[c.path] || (blobUrl[c.path] = URL.createObjectURL(await sbDownload(c.path))); if (sc === S) render(); } catch (e) { /* tenta depois */ } }
+        if (!ambUrl[c.id]) { try { ambUrl[c.id] = blobUrl[c.path] || (blobUrl[c.path] = URL.createObjectURL(await sbDownload(c.path))); delete ambErr[c.id]; if (sc === S) render(); } catch (e) { ambErr[c.id] = true; } }
         continue;
       }
       if (c.src === 'file' && c.path && !fileBuffers[c.id]) {
@@ -3108,7 +3108,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     const c = findCue(id);
     if (!c) return;
     if (active[id]) { stopAmb(id); return; }
-    if (c.src === 'file' && !fileBuffers[c.id] && !ambUrl[c.id]) { toast('Este som ainda está baixando da nuvem.'); sbHydrate(S); return; }
+    if (c.src === 'file' && !fileBuffers[c.id] && !ambUrl[c.id]) { toast(ambErr[c.id] ? 'Não consegui baixar este som da nuvem. Vou tentar de novo — confira a internet.' : 'Este som ainda está baixando da nuvem.'); sbHydrate(S); return; }
     ensure();
     active[id] = startAmb(c, posToGain(ambLevel(c), 1.2) * ambK(c));
   }
