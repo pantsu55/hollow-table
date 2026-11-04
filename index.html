@@ -1131,7 +1131,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.59';
+  const APP_VER = '0.60';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -1717,6 +1717,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       return '<li class="lib-row"><button type="button" class="icon-btn lib-play" data-action="libPlay" data-id="' + it.id + '" aria-label="' + (libPlaying === it.id ? 'Parar' : 'Ouvir') + ' ' + esc(it.name) + '">' + (libPlaying === it.id ? ICO.stop : ICO.play) + '</button>' +
         (forPick ? '<span class="lib-n">' + esc(it.name) + '</span>' : '<input type="text" class="lib-name" data-libname="' + it.id + '" value="' + esc(it.name) + '" aria-label="Nome">') +
         '<span class="tag">' + (it.kind === 'amb' ? 'Ambiente' : 'Efeito') + (it.dur ? ', ' + fmtDur(it.dur) : '') + '</span>' +
+        (it.cred && it.cred.ta && !forPick ? '<a class="lib-cred" href="https://tabletopaudio.com/" target="_blank" rel="noopener" title="Ver no Tabletop Audio">Tabletop Audio · ' + esc(it.cred.lic || 'CC BY-NC-ND 4.0') + '</a>' : '') +
         (it.cred && it.cred.fs && !forPick ? '<a class="lib-cred" href="https://freesound.org/s/' + Number(it.cred.fs) + '/" target="_blank" rel="noopener" title="Ver no Freesound">' + esc(it.cred.by || 'Freesound') + (it.cred.lic && it.cred.lic !== 'CC0' ? ' · ' + esc(it.cred.lic) : '') + '</a>' : '') +
         (forPick ? '<button type="button" class="btn sm' + (used ? ' quiet' : ' primary') + '" data-action="libUse" data-id="' + it.id + '"' + (used ? ' disabled' : '') + '>' + (used ? 'Na cena' : 'Adicionar') + '</button>'
           : '<select class="lib-kind" data-libkind="' + it.id + '" aria-label="Tipo"><option value="fx"' + (it.kind !== 'amb' ? ' selected' : '') + '>Efeito</option><option value="amb"' + (it.kind === 'amb' ? ' selected' : '') + '>Ambiente</option></select><button type="button" class="btn sm' + (libDelArm === it.id ? ' danger-fill' : ' ghost danger') + '" data-action="libDel" data-id="' + it.id + '">' + (libDelArm === it.id ? 'Confirmar' : 'Excluir') + '</button>') + '</li>';
@@ -1855,7 +1856,9 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   function libCredsCopy() {
     const L = libCredList();
     if (!L.length) return;
-    const txt = 'Sons do Freesound (freesound.org):\n' + L.map(function (x) { return '"' + (x.cred.name || x.name) + '", de ' + x.cred.by + ' (' + x.cred.lic + '): https://freesound.org/s/' + x.cred.fs + '/'; }).join('\n');
+    const F = L.filter(function (x) { return x.cred.fs; }), T = L.filter(function (x) { return x.cred.ta; });
+    const txt = [F.length ? 'Sons do Freesound (freesound.org):\n' + F.map(function (x) { return '"' + (x.cred.name || x.name) + '", de ' + x.cred.by + ' (' + x.cred.lic + '): https://freesound.org/s/' + x.cred.fs + '/'; }).join('\n') : '',
+      T.length ? 'Ambientes de Tabletop Audio (tabletopaudio.com), ' + T[0].cred.lic + ':\n' + T.map(function (x) { return '"' + (x.cred.name || x.name) + '"'; }).join('\n') : ''].filter(Boolean).join('\n\n');
     const done = function () { toast(L.length === 1 ? 'Crédito copiado.' : L.length + ' créditos copiados.'); };
     try { navigator.clipboard.writeText(txt).then(done, function () { libCredsShow(txt); }); } catch (e) { libCredsShow(txt); }
   }
@@ -2573,6 +2576,13 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   }
   const EMPTY_TRK = { name: '', terms: '', url: '' };
   function mus() { return (S.tracks && S.tracks[S.mi]) || EMPTY_TRK; }
+  /* links do YouTube / YouTube Music: abrem no app do YouTube (com a conta Premium de lá) */
+  function ytParse(u) {
+    const t = String(u || '').trim();
+    if (!/^https:\/\/((www|m|music)\.)?(youtube\.com|youtu\.be)\//i.test(t)) return null;
+    return { music: /^https:\/\/music\./i.test(t), url: t };
+  }
+  const srcName = function (u) { const y = ytParse(u); return y ? (y.music ? 'YouTube Music' : 'YouTube') : 'Spotify'; };
   function spParse(u) {
     const t = String(u || '').trim();
     const m = t.match(/open\.spotify\.com\/(?:intl-[a-z-]+\/)?(track|playlist|album|artist|episode|show)\/([A-Za-z0-9]+)/) || t.match(/^spotify:(track|playlist|album|artist|episode|show):([A-Za-z0-9]+)$/);
@@ -2787,11 +2797,17 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     const list = n > 1 ? '<ol class="tracks" aria-label="Músicas da cena">' + S.tracks.map(function (tr, k) {
       return '<li><button type="button" class="trk" data-action="trackGo" data-i="' + k + '"' + (k === S.mi ? ' aria-current="true"' : '') + '><span class="trk-num">' + (k + 1) + '</span><span>' + esc(tr.name || 'Sem nome') + '</span></button></li>';
     }).join('') + '</ol>' : '';
-    const txt = '<div class="m-txt"><p class="lbl-s">Música · Spotify</p><p class="m-name">' + esc(t.name || 'Música sem nome') + '</p>' + (t.terms ? '<p class="m-terms">' + esc(t.terms) + '</p>' : '') + '</div>';
+    const txt = '<div class="m-txt"><p class="lbl-s">Música · ' + srcName(t.url) + '</p><p class="m-name">' + esc(t.name || 'Música sem nome') + '</p>' + (t.terms ? '<p class="m-terms">' + esc(t.terms) + '</p>' : '') + '</div>';
     const msg = spMsg ? '<p class="sp-msg" role="status">' + esc(spMsg) + '</p>' : '';
     let h = '<section class="c-music" aria-label="Música">';
     if (!t.url) {
-      h += '<div class="music"><span class="play off" aria-hidden="true">' + ICO.note + '</span><div class="m-txt"><p class="lbl-s">Música · Spotify</p><p class="m-name">' + (n ? esc(t.name || 'Música sem link') : 'Sem música nesta cena') + '</p><p class="m-terms">Cole um link do Spotify em Preparar.</p></div></div>';
+      h += '<div class="music"><span class="play off" aria-hidden="true">' + ICO.note + '</span><div class="m-txt"><p class="lbl-s">Música · Spotify</p><p class="m-name">' + (n ? esc(t.name || 'Música sem link') : 'Sem música nesta cena') + '</p><p class="m-terms">Cole um link do Spotify ou do YouTube em Preparar.</p></div></div>';
+      return h + list + '</section>';
+    }
+    const yt = ytParse(t.url);
+    if (yt) {
+      h += '<div class="music"><a class="play" href="' + esc(safeUrl(yt.url)) + '" target="_blank" rel="noopener noreferrer" aria-label="Tocar ' + esc(t.name) + ' no ' + srcName(t.url) + '">' + ICO.play + '</a>' + txt + '</div>' +
+        '<div class="sp-row"><span>O play abre o app do ' + srcName(t.url) + ', com a sua conta.</span></div>';
       return h + list + '</section>';
     }
     if (SP.enabled && spModeGet() === 'app') {
@@ -3587,11 +3603,11 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
     const notas = '<section class="sec" id="sec-notas"><div class="sec-h"><h2>Notas</h2><p class="hint">Use **negrito** e comece a linha com "- " para fazer listas. Escreva [[nome do som]], ou toque no botão da nota musical, para pôr na nota um botão que toca aquele som, combo ou música da cena. Na Mesa, cada nota vira uma seção que abre e fecha.</p></div>' +
       (notes || '<p class="empty-hint">Nenhuma nota ainda.</p>') + '<button type="button" class="btn quiet add" data-action="noteAdd">' + ICO.plus + '<span>Adicionar nota</span></button></section>';
-    const musica = '<section class="sec" id="sec-musica"><div class="sec-h"><h2>Música</h2><p class="hint">Playlist, álbum ou faixa do Spotify: busque pelo nome ou cole o link. Com mais de uma, você escolhe qual tocar na Mesa.</p></div>' +
+    const musica = '<section class="sec" id="sec-musica"><div class="sec-h"><h2>Música</h2><p class="hint">Playlist, álbum ou faixa do Spotify, ou vídeo/playlist do YouTube e YouTube Music: busque no Spotify pelo nome ou cole o link. Com mais de uma, você escolhe qual tocar na Mesa.</p></div>' +
       S.tracks.map(function (t, k) {
         return '<div class="trk-ed"><div class="trk-ed-h"><span class="num">' + (k + 1) + '</span><input type="text" class="trk-name" id="f-tracks.' + k + '.name" data-bind="tracks.' + k + '.name" value="' + esc(t.name) + '" placeholder="Nome da música" aria-label="Nome da música ' + (k + 1) + '">' +
           '<button type="button" class="icon-btn sm danger" data-action="trackDel" data-i="' + k + '" aria-label="Remover música" title="Remover">' + ICO.trash + '</button></div>' +
-          '<div class="facts-grid two">' + inp('Link do Spotify', 'tracks.' + k + '.url', t.url, 'https://open.spotify.com/…') + inp('Termos de busca', 'tracks.' + k + '.terms', t.terms, 'Para achar parecidas') + '</div>' + spFindHtml(k) + '</div>';
+          '<div class="facts-grid two">' + inp('Link (Spotify ou YouTube)', 'tracks.' + k + '.url', t.url, 'https://open.spotify.com/… ou https://music.youtube.com/…') + inp('Termos de busca', 'tracks.' + k + '.terms', t.terms, 'Para achar parecidas') + '</div>' + spFindHtml(k) + '</div>';
       }).join('') + '<button type="button" class="btn quiet add" data-action="trackAdd">' + ICO.plus + '<span>Adicionar música</span></button></section>';
     const cues = S.cues.map(function (c) {
       return '<div class="cue"><button type="button" class="icon-btn" data-action="cueTest" data-id="' + c.id + '" aria-label="Ouvir ' + esc(label(c)) + '" title="' + (c.kind === 'fx' ? 'Ouvir' : 'Ouvir 4 s') + '">' + ICO.play + '</button>' +
@@ -3902,7 +3918,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       if (!n) return;
       S.mi = d != null ? (S.mi + Number(d) + n) % n : Math.max(0, Math.min(n - 1, i));
       spResume = ''; spPlaying = false; save(); render();
-      if (SP.enabled && spModeGet() !== 'app' && spStore.get()) spToggle();
+      if (SP.enabled && spModeGet() !== 'app' && spStore.get() && spParse(mus().url)) spToggle();
       return;
     }
     if (a === 'comboAdd') { S.combos.push({ id: uid(), name: 'Combo ' + (S.combos.length + 1), ids: [] }); commit(); return; }
