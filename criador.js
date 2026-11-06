@@ -15,9 +15,48 @@
   const ALIGN = ['Leal e Bom', 'Neutro e Bom', 'Caótico e Bom', 'Leal e Neutro', 'Neutro', 'Caótico e Neutro', 'Leal e Mau', 'Neutro e Mau', 'Caótico e Mau'];
   const LISTN = { brd: 'Bardo', clr: 'Clérigo', drd: 'Druida', pal: 'Paladino', pat: 'Patrulheiro', fei: 'Feiticeiro', bru: 'Bruxo', mag: 'Mago', art: 'Artífice' };
   const SRCN = { PHB: 'Livro do Jogador', XGtE: 'Guia de Xanathar', TCoE: 'Caldeirão de Tasha', SCAG: 'Guia do Aventureiro da Costa da Espada', Volo: 'Guia de Volo', MToF: 'Tomo dos Inimigos de Mordenkainen', EEPC: 'Elemental Evil', DMG: 'Guia do Mestre', Tortle: 'Tortle Package', Locathah: 'Locathah Rising', WBtW: 'Wild Beyond the Witchlight', VRGtR: 'Guia de Van Richten', FToD: 'Tesouro dos Dragões de Fizban', SRD: 'SRD' };
-  const STEPS = [['cls', 'Classe'], ['race', 'Espécie'], ['at', 'Atributos'], ['bg', 'Antecedente'], ['sk', 'Perícias'], ['feat', 'Habilidades'], ['eq', 'Equipamento'], ['sp', 'Magias'], ['fim', 'Revisão']];
+  const STEPS = [['cls', 'Classe'], ['race', 'Raça'], ['at', 'Atributos'], ['bg', 'Antecedente'], ['sk', 'Perícias'], ['feat', 'Habilidades'], ['eq', 'Equipamento'], ['sp', 'Magias'], ['fim', 'Revisão']];
 
   let D = null, IX = null, S = null, OPT = null, root = null, prevOverflow = '';
+  /* artes: fan art do ArtStation guardadas no Supabase (bucket público "arte"); créditos em creditos.json */
+  const ARTE = 'https://ksucnjrmcagzepxahync.supabase.co/storage/v1/object/public/arte/';
+  let ART = null, artBusy = false;
+  const SUBART = { 'elfo:drow': 'drow', 'anao:duergar': 'duergar', 'elfo:eladrin': 'eladrin', 'elfo:mar': 'elfomar', 'elfo:shadarkai': 'shadarkai', 'gnomo:profundezas': 'gnomoprof', 'gith:githzerai': 'githzerai', 'genasi:ar': 'genasi-ar', 'genasi:terra': 'genasi-terra', 'genasi:fogo': 'genasi-fogo', 'genasi:agua': 'genasi-agua' };
+  function artLoad() {
+    if (artBusy) return;
+    let fresh = false;
+    try { const c = JSON.parse(localStorage.getItem('ht-arte') || 'null'); if (c && c.itens) { ART = c.itens; fresh = Date.now() - (c.at || 0) < 864e5; } } catch (e) { /* sem cache */ }
+    if (fresh) return;
+    artBusy = true;
+    fetch(ARTE + 'creditos.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j || !j.itens) return;
+      const had = JSON.stringify(ART); ART = j.itens;
+      try { localStorage.setItem('ht-arte', JSON.stringify({ at: Date.now(), itens: j.itens })); } catch (e) { /* ok */ }
+      if (root && had !== JSON.stringify(ART)) paint(true);
+    }).catch(function () { /* sem artes: segue só com texto */ }).then(function () { artBusy = false; });
+  }
+  function art(kind, k, sub) {
+    if (!ART || !k) return null;
+    const key = kind === 'bg' ? 'bg-' + k : kind === 'race' ? (sub && SUBART[k + ':' + sub]) || k : k;
+    return ART[key] || null;
+  }
+  function artThumb(a) { return a ? '<span class="cr-cimg"><img src="' + esc(ARTE + a.p) + '" alt="" loading="lazy" decoding="async"></span>' : ''; }
+  function artFig(a, alt) {
+    if (!a) return '';
+    return '<figure class="cr-art"><img src="' + esc(ARTE + a.p) + '" alt="' + esc(alt) + '" decoding="async"><figcaption>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a> · ArtStation</figcaption></figure>';
+  }
+  const gimg = function () { return ART ? ' cr-gimg' : ''; };
+  function artCard(attr, a, inner) {
+    return '<button type="button" class="cr-card' + (a ? ' cr-has' : '') + '" ' + attr + '>' + artThumb(a) + '<span class="cr-ctx">' + inner + (a ? '<small class="cr-by">arte: ' + esc(a.by) + '</small>' : '') + '</span></button>';
+  }
+  /* raças agrupadas: as monstruosas e as sombrias mudam como o mundo reage ao personagem */
+  const RGRP = [
+    ['Comuns', ['anao', 'elfo', 'halfling', 'humano', 'draconato', 'gnomo', 'meioelfo', 'meioorc', 'tiferino'], 'Do Livro do Jogador. Fazem parte do dia a dia de quase todo reino.', '', ''],
+    ['Exóticas', ['aasimar', 'firbolg', 'golias', 'kenku', 'lagarto', 'tabaxi', 'tritao', 'aarakocra', 'genasi', 'gith', 'tartaruga', 'locathah', 'fada', 'leporino', 'linhagem'], 'Raras no mundo: chamam atenção por onde passam e rendem perguntas curiosas, às vezes desconfiadas.', '', ''],
+    ['Linhagens sombrias', ['dhampir', 'hexblood', 'reborn'], 'Tocadas por vampiros, bruxas ou pela própria morte. Quem descobre costuma reagir com medo; dá para esconder, mas o segredo pesa na história.', 'sombra', 'Linhagem sombria'],
+    ['Monstruosas', ['bugbear', 'goblin', 'hobgoblin', 'kobold', 'orc', 'yuanti'], 'Em muitos lugares são vistas como monstros ou inimigas: portas fechadas, guardas de olho e preço mais alto na taverna. Combine com o Mestre como isso entra no roleplay.', 'monstro', 'Raça monstruosa']
+  ];
+  function raceGroup(k) { for (let i = 0; i < RGRP.length; i++) if (RGRP[i][1].indexOf(k) >= 0) return RGRP[i]; return RGRP[1]; }
   const esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   const md = function (v) { return Math.floor((v - 10) / 2); };
   const sgn = function (n) { return n >= 0 ? '+' + n : String(n); };
@@ -55,7 +94,7 @@
   function rpair(k) { const r = R(), s = SR(); return [r && r[k], s && s[k]].filter(Boolean); }
   function rboth(k) { const r = R(), s = SR(); return [].concat((r && r[k]) || [], (s && s[k]) || []); }
   function asiLevels() { const c = C(); return c ? c.asi.filter(function (l) { return l <= S.lvl; }) : []; }
-  /* bônus fixos e "vagas" de bônus livre da espécie */
+  /* bônus fixos e "vagas" de bônus livre da raça */
   function raceFixed() {
     const r = R(), s = SR(), o = {};
     if (!r) return o;
@@ -204,7 +243,7 @@
     if (c) L.push({ id: 'cls', label: 'Classe (' + c.n + ')', n: c.sk[0], from: c.sk[1].length ? c.sk[1] : ALL_SK });
     const rc = rget('skch');
     const rcs = rpair('skch');
-    rcs.forEach(function (x, i) { L.push({ id: 'race' + i, label: 'Espécie', n: x[0], from: x[1].length ? x[1] : ALL_SK }); });
+    rcs.forEach(function (x, i) { L.push({ id: 'race' + i, label: 'Raça', n: x[0], from: x[1].length ? x[1] : ALL_SK }); });
     if (R() && R().lineage && S.lin === 'sk') L.push({ id: 'lin', label: 'Traço variável', n: 1, from: ALL_SK });
     if (b && b.skch) L.push({ id: 'bg', label: 'Antecedente', n: b.skch[0], from: b.skch[1] });
     if (s && s.skx) s.skx.forEach(function (x, i) { if (x[0] <= S.lvl && x[1]) L.push({ id: 'sub' + i, label: s.n, n: x[1], from: x[2].length ? x[2] : ALL_SK, exp: x[3] }); });
@@ -258,7 +297,7 @@
     const addCh = function (id, label, n, cats) { for (let i = 0; i < n; i++) out.ch.push({ id: id + i, label: label, cats: cats }); };
     if (c) { (c.tool || []).forEach(function (t) { out.fixed.push(t); }); if (c.toolch) addCh('cls', 'Classe', c.toolch[0], c.toolch[1]); }
     const rt = rget('tool'); if (rt) rt.split(',').forEach(function (t) { out.fixed.push(t.trim()); });
-    const rtc = rpair('toolch'); rtc.forEach(function (x, i) { addCh('race' + i + '_', 'Espécie', x[0], x[1]); });
+    const rtc = rpair('toolch'); rtc.forEach(function (x, i) { addCh('race' + i + '_', 'Raça', x[0], x[1]); });
     if (b) b.tool.forEach(function (t, i) { if (t.indexOf('ch:') === 0) addCh('bg' + i + '_', 'Antecedente', 1, [t.slice(3)]); else out.fixed.push(t); });
     if (s && S.lvl >= 1) { (s.tool || []).forEach(function (t) { out.fixed.push(t); }); if (s.toolch) addCh('sub', s.n, s.toolch[0], s.toolch[1]); }
     out.fixed = uniq(out.fixed);
@@ -361,14 +400,14 @@
     const L = [];
     const c = C(), r = R();
     if (id === 'cls') { if (!c) L.push('Escolha uma classe.'); else if (S.lvl >= c.subLv && !SUB()) L.push('Escolha: ' + c.subN + '.'); }
-    if (id === 'race') { if (!r) L.push('Escolha uma espécie.'); else if (r.subs.length > 1 && !SR()) L.push('Escolha a variação da espécie.'); }
+    if (id === 'race') { if (!r) L.push('Escolha uma raça.'); else if (r.subs.length > 1 && !SR()) L.push('Escolha a variação da raça.'); }
     if (id === 'at') {
       if (S.m === 'pb') { const sp = pbSpent(); if (sp > 27) L.push('A compra passou de 27 pontos.'); else if (sp < 27) L.push('Ainda sobram ' + (27 - sp) + ' pontos.'); }
       if (S.m === 'arr' || S.m === 'roll') { if (AT.some(function (a) { return S.arr[a[0]] == null; })) L.push('Distribua todos os valores.'); }
       if (S.m === 'roll' && S.rolls.length < 6) L.push('Role os dados.');
-      raceSlots().forEach(function (v, i) { if (!S.ra[i]) L.push('Escolha onde vai o +' + v + ' da espécie.'); });
+      raceSlots().forEach(function (v, i) { if (!S.ra[i]) L.push('Escolha onde vai o +' + v + ' da raça.'); });
       asiLevels().forEach(function (l) { const a = S.asi[l]; if (!a || (a.t === 'feat' ? !a.f || (IX.feat[a.f] && IX.feat[a.f][4].length && !a.fa) : !a.a)) L.push('Complete o aumento do ' + l + 'º nível.'); });
-      if (rget('feat') && !S.rfeat.f) L.push('Escolha o talento da espécie.');
+      if (rget('feat') && !S.rfeat.f) L.push('Escolha o talento da raça.');
     }
     if (id === 'bg') { if (!BG()) L.push('Escolha um antecedente.'); }
     if (id === 'sk') {
@@ -378,7 +417,7 @@
       if (S.lang.length < langCount()) L.push('Idiomas: faltam ' + (langCount() - S.lang.length) + '.');
       toolDefs().ch.forEach(function (x) { if (!S.tool[x.id]) L.push('Ferramenta (' + x.label + ') sem escolha.'); });
     }
-    if (id === 'feat') { choiceDefs().forEach(function (d) { const n = (S.ch[d.li] || []).length; if (n < d.n) L.push(d.label + ': faltam ' + (d.n - n) + '.'); }); if (R() && /esc/.test(rget('spat') || '') && !S.rspat) L.push('Escolha o atributo das magias da espécie.'); }
+    if (id === 'feat') { choiceDefs().forEach(function (d) { const n = (S.ch[d.li] || []).length; if (n < d.n) L.push(d.label + ': faltam ' + (d.n - n) + '.'); }); if (R() && /esc/.test(rget('spat') || '') && !S.rspat) L.push('Escolha o atributo das magias da raça.'); }
     if (id === 'eq') { if (S.eq.mode === 'gold' && S.eq.gold == null) L.push('Role o ouro inicial.'); }
     if (id === 'sp') {
       const k = spCounts();
@@ -389,7 +428,7 @@
       }
       if ((S.ch.inv || []).some(function (x) { const o = optGet('inv', x); return o && /Rajada Mística/.test(o[3]); }) && S.sp.c.indexOf('eldritch-blast') < 0) L.push('Suas invocações pedem o truque Rajada Mística.');
       const rs = rget('spch'), ss = SUB() && SUB().spch;
-      if (rs && S.sp.rc.length < rs[2]) L.push('Truque da espécie sem escolha.');
+      if (rs && S.sp.rc.length < rs[2]) L.push('Truque da raça sem escolha.');
       if (ss && S.sp.sc.length < ss[2]) L.push('Truque da subclasse sem escolha.');
     }
     if (id === 'fim') { if (!S.name.trim()) L.push('Dê um nome ao personagem.'); }
@@ -414,10 +453,11 @@
     let h = '<section class="cr-sec"><h3>Nível</h3><div class="cr-lvl"><button type="button" class="cr-btn q" data-ca="lvl" data-d="-1" aria-label="Diminuir nível">−</button><b class="cr-big">' + S.lvl + '</b><button type="button" class="cr-btn q" data-ca="lvl" data-d="1" aria-label="Aumentar nível">+</button><span class="cr-mut">Bônus de proficiência ' + sgn(prof()) + '</span></div>' +
       '<div class="cr-chips cr-wrap">' + [1, 3, 5, 10, 15, 20].map(function (n) { return chip('data-ca="lvlset" data-v="' + n + '"', String(n), S.lvl === n); }).join('') + '</div></section>';
     if (c) {
-      h += '<section class="cr-sec cr-pick"><div class="cr-row"><h3>' + esc(c.n) + src(c.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="cls">Trocar</button></div><p class="cr-mut">' + esc(c.desc) + '</p>' +
+      const ca = art('cls', c.k);
+      h += '<section class="cr-sec cr-pick' + (ca ? ' cr-hasart' : '') + '">' + artFig(ca, c.n) + '<div class="cr-artbody"><div class="cr-row"><h3>' + esc(c.n) + src(c.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="cls">Trocar</button></div><p class="cr-mut">' + esc(c.desc) + '</p>' +
         '<p class="cr-tags"><span>d' + c.hd + ' de vida</span><span>Principal: ' + ATN[c.pa] + '</span><span>Salvaguardas: ' + c.sv.map(function (x) { return ATN[x]; }).join(' e ') + '</span>' + (c.cast ? '<span>Conjurador</span>' : '') + '</p>' +
         '<p class="cr-mut sm">' + esc(c.prof) + '</p>' +
-        '<details class="cr-det" open><summary>Características até o ' + S.lvl + 'º nível</summary>' + feats(c.f, S.lvl) + '</details></section>';
+        '<details class="cr-det" open><summary>Características até o ' + S.lvl + 'º nível</summary>' + feats(c.f, S.lvl) + '</details></div></section>';
       if (S.lvl >= c.subLv) {
         const s = SUB();
         h += '<section class="cr-sec"><h3>' + esc(c.subN) + '</h3>';
@@ -426,7 +466,7 @@
         h += '</section>';
       } else h += '<p class="cr-mut sm">' + esc(c.subN) + ' é escolhido no ' + c.subLv + 'º nível.</p>';
     } else {
-      h += '<section class="cr-sec"><h3>Classe</h3><div class="cr-grid">' + D.classes.map(function (x) { return '<button type="button" class="cr-card" data-ca="cls" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(x.desc) + '</span><small>d' + x.hd + ' · ' + ATN[x.pa] + '</small></button>'; }).join('') + '</div></section>';
+      h += '<section class="cr-sec"><h3>Classe</h3><div class="cr-grid' + gimg() + '">' + D.classes.map(function (x) { return artCard('data-ca="cls" data-k="' + x.k + '"', art('cls', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(x.desc) + '</span><small>d' + x.hd + ' · ' + ATN[x.pa] + '</small>'); }).join('') + '</div></section>';
     }
     return h;
   }
@@ -446,13 +486,20 @@
     if (!r) {
       const q = fold(S.q);
       const L = D.races.filter(function (x) { return !q || fold(x.n + ' ' + x.subs.map(function (s) { return s.n; }).join(' ')).indexOf(q) >= 0; });
-      return '<section class="cr-sec"><h3>Espécie</h3><input type="search" class="cr-in" data-cf="q" placeholder="Buscar: elfo, anão, tiferino…" value="' + esc(S.q) + '" autocomplete="off"><div class="cr-grid">' + L.map(function (x) {
+      const card = function (x) {
         const a = x.flex ? '+2/+1 livres' : asiTxt(x.asi);
-        return '<button type="button" class="cr-card" data-ca="race" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(a) + (x.subs.length > 1 ? ' · ' + x.subs.length + ' variações' : '') + '</span></button>';
-      }).join('') + '</div></section>';
+        return artCard('data-ca="race" data-k="' + x.k + '"', art('race', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(a) + (x.subs.length > 1 ? ' · ' + x.subs.length + ' variações' : '') + '</span>');
+      };
+      return '<section class="cr-sec"><h3>Raça</h3><input type="search" class="cr-in" data-cf="q" placeholder="Buscar: elfo, anão, tiefling, goliath…" value="' + esc(S.q) + '" autocomplete="off">' + RGRP.map(function (g) {
+        const M = L.filter(function (x) { return raceGroup(x.k) === g; });
+        if (!M.length) return '';
+        return '<div class="cr-grp' + (g[3] ? ' cr-grp-' + g[3] : '') + '"><div class="cr-grph"><h4>' + esc(g[0]) + ' <small>' + M.length + '</small></h4><p>' + esc(g[2]) + '</p></div><div class="cr-grid' + gimg() + '">' + M.map(card).join('') + '</div></div>';
+      }).join('') + (L.length ? '' : '<p class="cr-mut sm">Nenhuma raça com esse nome.</p>') + '</section>';
     }
     const s = SR();
-    let h = '<section class="cr-sec cr-pick"><div class="cr-row"><h3>' + esc(r.n) + src(r.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="race">Trocar</button></div>';
+    const ra = art('race', r.k, s && s.k), rg = raceGroup(r.k);
+    let h = '<section class="cr-sec cr-pick' + (ra ? ' cr-hasart' : '') + '">' + artFig(ra, s && r.subs.length > 1 ? s.n : r.n) + '<div class="cr-artbody"><div class="cr-row"><h3>' + esc(r.n) + src(r.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="race">Trocar</button></div>';
+    if (rg[3]) h += '<p class="cr-note cr-grp-' + rg[3] + '"><b>' + esc(rg[4]) + '.</b> ' + esc(rg[2]) + '</p>';
     if (r.subs.length > 1) h += '<div class="cr-chips cr-wrap">' + r.subs.map(function (x) { return chip('data-ca="sr" data-k="' + x.k + '"', esc(x.n) + src(x.src), s && s.k === x.k); }).join('') + '</div>';
     h += raceMeta();
     const fx = raceFixed();
@@ -461,7 +508,7 @@
     if (s && s.dmg) h += '<p class="cr-mut sm">Sopro: ' + esc(s.dmg) + ', ' + esc(s.br) + '. Resistência a ' + esc(s.dmg) + '.</p>';
     if (r.lineage) h += '<div class="cr-chips">' + chip('data-ca="lin" data-v="dv"', 'Visão no escuro 18 m', S.lin === 'dv') + chip('data-ca="lin" data-v="sk"', 'Uma perícia', S.lin === 'sk') + '</div>';
     if (!r.flex && r.k !== 'linhagem') h += '<label class="cr-chk"><input type="checkbox" data-cc="custom"' + (S.custom ? ' checked' : '') + '> Personalizar a origem (Caldeirão de Tasha): mover os bônus de atributo para onde quiser</label>';
-    h += '</section>';
+    h += '</div></section>';
     return h;
   }
   function selAt(attr, val, excl, ph) {
@@ -487,13 +534,13 @@
     const slotsR = raceSlots();
     if (slotsR.length) {
       const r = R();
-      h += '<section class="cr-sec"><h3>Bônus da espécie</h3>' + (r.flex ? '<div class="cr-chips">' + chip('data-ca="ra3" data-v="0"', '+2 e +1', !S.ra3) + chip('data-ca="ra3" data-v="1"', '+1, +1 e +1', !!S.ra3) + '</div>' : '') + '<div class="cr-row cr-wrap">' + slotsR.map(function (v, i) {
+      h += '<section class="cr-sec"><h3>Bônus da raça</h3>' + (r.flex ? '<div class="cr-chips">' + chip('data-ca="ra3" data-v="0"', '+2 e +1', !S.ra3) + chip('data-ca="ra3" data-v="1"', '+1, +1 e +1', !!S.ra3) + '</div>' : '') + '<div class="cr-row cr-wrap">' + slotsR.map(function (v, i) {
         const fx = raceFixed(), excl = S.ra.filter(function (x, j) { return j !== i && x; });
         if (!r.flex && !S.custom) Object.keys(fx).forEach(function (k) { if (fx[k] > 0) excl.push(k); });
         return '<label class="cr-lab">+' + v + ' ' + selAt('data-cs="ra" data-i="' + i + '"', S.ra[i], excl) + '</label>';
-      }).join('') + '</div>' + (Object.keys(rb).length ? '<p class="cr-mut sm">Total da espécie: ' + esc(asiTxt(rb)) + '</p>' : '') + '</section>';
+      }).join('') + '</div>' + (Object.keys(rb).length ? '<p class="cr-mut sm">Total da raça: ' + esc(asiTxt(rb)) + '</p>' : '') + '</section>';
     }
-    if (rget('feat')) h += '<section class="cr-sec"><h3>Talento da espécie</h3>' + featPicker('rf', S.rfeat) + '</section>';
+    if (rget('feat')) h += '<section class="cr-sec"><h3>Talento da raça</h3>' + featPicker('rf', S.rfeat) + '</section>';
     const lv = asiLevels();
     if (lv.length) {
       h += '<section class="cr-sec"><h3>Aumentos de atributo</h3><p class="cr-mut sm">Em cada um: +2 em um atributo, +1 em dois, ou um talento. Máximo 20.</p>';
@@ -520,16 +567,17 @@
   }
   function hBg() {
     const b = BG();
-    if (!b) return '<section class="cr-sec"><h3>Antecedente</h3><p class="cr-mut sm">De onde o personagem vem. Dá duas perícias, ferramentas ou idiomas, equipamento e uma característica.</p><div class="cr-grid">' + D.bgs.map(function (x) { return '<button type="button" class="cr-card" data-ca="bg" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(x.sk.map(function (k) { return SKN[k]; }).concat(x.skch ? ['+' + x.skch[0] + ' à escolha'] : []).join(', ')) + '</span></button>'; }).join('') + '</div></section>';
+    if (!b) return '<section class="cr-sec"><h3>Antecedente</h3><p class="cr-mut sm">De onde o personagem vem. Dá duas perícias, ferramentas ou idiomas, equipamento e uma característica.</p><div class="cr-grid' + gimg() + '">' + D.bgs.map(function (x) { return artCard('data-ca="bg" data-k="' + x.k + '"', art('bg', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(x.sk.map(function (k) { return SKN[k]; }).concat(x.skch ? ['+' + x.skch[0] + ' à escolha'] : []).join(', ')) + '</span>'); }).join('') + '</div></section>';
     const tl = b.tool.map(function (t) { return t.indexOf('ch:') === 0 ? { artesao: 'uma ferramenta de artesão', instrumento: 'um instrumento musical', jogo: 'um jogo' }[t.slice(3)] : t; });
-    return '<section class="cr-sec cr-pick"><div class="cr-row"><h3>' + esc(b.n) + src(b.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="bg">Trocar</button></div>' +
+    const ba = art('bg', b.k);
+    return '<section class="cr-sec cr-pick' + (ba ? ' cr-hasart' : '') + '">' + artFig(ba, b.n) + '<div class="cr-artbody"><div class="cr-row"><h3>' + esc(b.n) + src(b.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="bg">Trocar</button></div>' +
       '<p class="cr-tags"><span>Perícias: ' + esc(b.sk.map(function (k) { return SKN[k]; }).join(', ') + (b.skch ? (b.sk.length ? ' + ' : '') + b.skch[0] + ' à escolha' : '')) + '</span>' + (tl.length ? '<span>Ferramentas: ' + esc(tl.join(', ')) + '</span>' : '') + (b.lang ? '<span>' + b.lang + ' idioma' + (b.lang > 1 ? 's' : '') + '</span>' : '') + '</p>' +
       '<ul class="cr-fl"><li><div><b>' + esc(b.fn) + '</b> ' + esc(b.fd) + '</div></li></ul><p class="cr-mut sm">Equipamento: ' + esc(b.eq.map(function (e) { return e.replace(/^@ferramenta$/, 'ferramenta escolhida').replace(/^@instrumento$/, 'instrumento escolhido').replace(/\*(\d+)$/, ' ×$1'); }).join(', ')) + ' e ' + b.po + ' po.</p>' +
-      '<label class="cr-lab">Tendência <select class="cr-in" data-cs="align"><option value="">—</option>' + ALIGN.map(function (a) { return '<option' + (S.align === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></label></section>';
+      '<label class="cr-lab">Tendência <select class="cr-in" data-cs="align"><option value="">—</option>' + ALIGN.map(function (a) { return '<option' + (S.align === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></label></div></section>';
   }
   function hSk() {
     const fx = skFixed(), all = skAll();
-    let h = '<section class="cr-sec"><h3>Perícias</h3>' + (fx.list.length ? '<p class="cr-mut sm">Já vêm da espécie e do antecedente: ' + esc(fx.list.map(function (k) { return SKN[k]; }).join(', ')) + '.</p>' : '');
+    let h = '<section class="cr-sec"><h3>Perícias</h3>' + (fx.list.length ? '<p class="cr-mut sm">Já vêm da raça e do antecedente: ' + esc(fx.list.map(function (k) { return SKN[k]; }).join(', ')) + '.</p>' : '');
     skSources().forEach(function (s) {
       const mine = S.sk[s.id] || [], full = mine.length >= s.n;
       h += '<div class="cr-blk"><div class="cr-row"><b>' + esc(s.label) + '</b><span class="cr-cnt' + (full ? ' ok' : '') + '">' + mine.length + '/' + s.n + '</span></div><div class="cr-chips cr-wrap">' + s.from.map(function (k) {
@@ -569,7 +617,7 @@
       }).join('') + '</div></section>';
     });
     const sp = rget('spat');
-    if (sp === 'esc') h += '<section class="cr-sec"><h3>Atributo das magias da espécie</h3><div class="cr-chips">' + ['int', 'sab', 'car'].map(function (k) { return chip('data-ca="rspat" data-v="' + k + '"', ATN[k], S.rspat === k); }).join('') + '</div></section>';
+    if (sp === 'esc') h += '<section class="cr-sec"><h3>Atributo das magias da raça</h3><div class="cr-chips">' + ['int', 'sab', 'car'].map(function (k) { return chip('data-ca="rspat" data-v="' + k + '"', ATN[k], S.rspat === k); }).join('') + '</div></section>';
     const c = C(), s = SUB();
     if (c) {
       h += '<section class="cr-sec"><h3>Tudo o que o personagem sabe fazer</h3>';
@@ -633,10 +681,10 @@
     let h = '';
     const rs = raceSpells(), fr = freeSpells();
     if (rs.length || fr.length) {
-      h += '<section class="cr-sec"><h3>Magias que já vêm prontas</h3><p class="cr-mut sm">Não contam no limite.</p><ul class="cr-spl">' + rs.map(function (x) { return IX.sp[x[0]] ? spRow(IX.sp[x[0]], true, true, 'espécie') : ''; }).join('') + fr.map(function (x) { return IX.sp[x[0]] ? spRow(IX.sp[x[0]], true, true, x[1]) : ''; }).join('') + '</ul></section>';
+      h += '<section class="cr-sec"><h3>Magias que já vêm prontas</h3><p class="cr-mut sm">Não contam no limite.</p><ul class="cr-spl">' + rs.map(function (x) { return IX.sp[x[0]] ? spRow(IX.sp[x[0]], true, true, 'raça') : ''; }).join('') + fr.map(function (x) { return IX.sp[x[0]] ? spRow(IX.sp[x[0]], true, true, x[1]) : ''; }).join('') + '</ul></section>';
     }
     const rch = rget('spch'), sch = SUB() && SUB().spch;
-    [[rch, 'rc', 'Truque da espécie'], [sch, 'sc', 'Truque da subclasse']].forEach(function (z) {
+    [[rch, 'rc', 'Truque da raça'], [sch, 'sc', 'Truque da subclasse']].forEach(function (z) {
       if (!z[0]) return;
       const li = z[0][1], n = z[0][2], mine = S.sp[z[1]];
       const done = mine.length >= n, rows = D.spells.filter(function (x) { return x[2] === 0 && x[9].indexOf(li) >= 0 && (!done || mine.indexOf(x[0]) >= 0); });
@@ -820,10 +868,10 @@
     const byLvl = {};
     const addSp = function (key, tag) { if (!IX.sp[key] || spl.indexOf(key) >= 0) return; spl.push(key); const l = IX.sp[key][2]; (byLvl[l] = byLvl[l] || []).push(spName(key) + (tag ? ' (' + tag + ')' : '')); };
     S.sp.c.forEach(function (x) { addSp(x); });
-    S.sp.rc.forEach(function (x) { addSp(x, 'espécie'); });
+    S.sp.rc.forEach(function (x) { addSp(x, 'raça'); });
     S.sp.sc.forEach(function (x) { addSp(x, s ? s.n : ''); });
     freeSpells().forEach(function (x) { addSp(x[0], 'sempre preparada'); });
-    raceSpells().forEach(function (x) { addSp(x[0], 'espécie'); });
+    raceSpells().forEach(function (x) { addSp(x[0], 'raça'); });
     S.sp.k.forEach(function (x) { addSp(x, k && k.m === 'book' ? 'grimório' : ''); });
     Object.keys(S.sp.arc).forEach(function (l) { if (S.sp.arc[l]) addSp(S.sp.arc[l], 'Arcana Mística'); });
     S.sp.x.forEach(function (x) { addSp(x, 'extra'); });
@@ -918,9 +966,19 @@
     '.cr-sp details{flex:1;min-width:0}.cr-sp summary{cursor:pointer;list-style:none;display:grid;gap:2px}.cr-sp summary::-webkit-details-marker{display:none}.cr-sp p{margin:6px 0 2px;font-size:15px;color:var(--fg);line-height:1.45}' +
     '.cr-tag2{font-family:var(--mono);font-size:10px;color:var(--ok);letter-spacing:.04em}.cr-spn{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 6px}.cr-spn .cr-src{margin-left:0}' +
     '.cr-sum{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.cr-sum div{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:2px}.cr-sum div:first-child{grid-column:span 2}.cr-sum div{align-content:start}.cr-sum span{font-size:12px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}' +
+    '.cr-card.cr-has{padding:0;overflow:hidden;gap:0}.cr-gimg{grid-template-columns:repeat(auto-fill,minmax(158px,1fr))}.cr-card .cr-cimg{display:block;aspect-ratio:3/4;background:var(--surface-2);overflow:hidden}.cr-card .cr-cimg img{width:100%;height:100%;object-fit:cover;object-position:50% 15%;display:block}.cr-gimg .cr-card .cr-ctx span{font-size:13px}' +
+    '.cr-card .cr-ctx{display:grid;gap:4px;align-content:start;color:var(--fg);font-size:inherit;line-height:inherit}.cr-card.cr-has .cr-ctx{padding:10px 12px 12px}.cr-card .cr-ctx span{font-size:14px;color:var(--muted);line-height:1.4}.cr-card small.cr-by{font-family:inherit;font-size:11px;letter-spacing:0;opacity:.75}' +
+    '.cr-grp{display:grid;gap:8px}.cr-grp+.cr-grp{border-top:1px solid var(--line);padding-top:14px}.cr-grph h4{margin:0;font-family:var(--serif);font-size:16px;letter-spacing:.04em}.cr-grph h4 small{font-family:var(--mono);font-size:11px;color:var(--muted);margin-left:4px}.cr-grph p{margin:2px 0 0;font-size:14px;color:var(--muted);line-height:1.4}' +
+    '.cr-grp-monstro .cr-grph h4{color:var(--hot)}.cr-grp-sombra .cr-grph h4{color:#c4a8ff}' +
+    '.cr-note{margin:0;font-size:14px;line-height:1.45;color:var(--muted);border-left:3px solid var(--line);padding:4px 0 4px 10px}.cr-note b{color:var(--fg)}.cr-note.cr-grp-monstro{border-color:var(--hot)}.cr-note.cr-grp-sombra{border-color:#c4a8ff}' +
+    '.cr-hasart{grid-template-columns:minmax(0,230px) minmax(0,1fr);align-items:start}.cr-artbody{display:grid;gap:12px;min-width:0}' +
+    '.cr-art{margin:0;display:grid;gap:4px;min-width:0}.cr-art img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:50% 15%;border-radius:10px;border:1px solid var(--line);display:block;background:var(--surface-2)}' +
+    '.cr-art figcaption{font-size:11px;color:var(--muted);line-height:1.3}.cr-art figcaption a{color:inherit}' +
+    '@media(max-width:620px){.cr-hasart{grid-template-columns:minmax(0,1fr)}.cr-art img{aspect-ratio:auto;max-height:300px}}' +
     '.cr-warn{border-color:rgba(255,184,107,.5)}.cr-warn ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:15px}.cr-link{background:none;border:0;color:var(--accent);font:inherit;padding:0;cursor:pointer;text-decoration:underline}';
   function open(o) {
     index();
+    artLoad();
     o = o || {};
     let st = o.state;
     if (!st) { try { st = JSON.parse(localStorage.getItem('ht-cr-draft') || 'null'); } catch (e) { st = null; } }
