@@ -474,17 +474,17 @@
       '<div class="cr-chips cr-wrap">' + [1, 3, 5, 10, 15, 20].map(function (n) { return chip('data-ca="lvlset" data-v="' + n + '"', String(n), S.lvl === n); }).join('') + '</div></section>';
     if (c) {
       const ca = art('cls', c.k);
-      h += '<section class="cr-sec cr-pick' + (ca ? ' cr-hasart' : '') + '">' + artFig(ca, c.n) + '<div class="cr-artbody"><div class="cr-row"><h3>' + esc(c.n) + src(c.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="cls">Trocar</button></div><p class="cr-mut">' + esc(c.desc) + '</p>' +
+      h += '<section class="cr-sec cr-pick' + (ca ? ' cr-hasart' : '') + '">' + artFig(ca, c.n) + '<div class="cr-artbody"><div class="cr-row"><h3>' + esc(c.n) + src(c.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="cls">Trocar</button></div><p class="cr-mut">' + esc(c.res || c.desc) + ' ' + more('cls', c.k) + '</p>' +
         '<p class="cr-tags"><span>d' + c.hd + ' de vida</span><span>Principal: ' + ATN[c.pa] + '</span><span>Salvaguardas: ' + c.sv.map(function (x) { return ATN[x]; }).join(' e ') + '</span>' + (c.cast ? '<span>Conjurador</span>' : '') + '</p>' +
         '<p class="cr-mut sm">' + esc(c.prof) + '</p>' +
         '<details class="cr-det" open><summary>Características até o ' + S.lvl + 'º nível</summary>' + feats(c.f, S.lvl) + '</details></div></section>';
       if (S.lvl >= c.subLv) {
         const s = SUB();
         h += '<section class="cr-sec"><h3>' + esc(c.subN) + '</h3>';
-        if (s) h += '<div class="cr-pick cr-subp"><div class="cr-row"><b>' + esc(s.n) + src(s.src) + '</b><button type="button" class="cr-btn q sm" data-ca="clr" data-k="sub">Trocar</button></div>' + subInfo(s, true) + (s.hint ? '<p class="cr-mut sm">' + esc(s.hint) + '</p>' : '') + feats(s.f, S.lvl) + '</div>';
+        if (s) h += '<div class="cr-pick cr-subp"><div class="cr-row"><b>' + esc(s.n) + src(s.src) + '</b><button type="button" class="cr-btn q sm" data-ca="clr" data-k="sub">Trocar</button></div>' + subInfo(s, true) + (s.hint ? '<p class="cr-mut sm">' + esc(s.hint) + '</p>' : '') + feats(s.f, S.lvl) + '<p>' + more('sub', c.k, s.k, 'Ler a página completa') + '</p></div>';
         else h += '<p class="cr-mut sm">Leia as opções e toque na que combina com o personagem.</p><div class="cr-subs">' + c.subs.map(function (x) { return '<button type="button" class="cr-card cr-subc" data-ca="sub" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b>' + subInfo(x, false) + '</button>'; }).join('') + '</div>';
         h += '</section>';
-      } else h += '<section class="cr-sec"><h3>' + esc(c.subN) + '</h3><p class="cr-mut sm">É escolhido no ' + c.subLv + 'º nível. Dá para conhecer as opções desde já:</p><details class="cr-det"><summary>Ver as ' + c.subs.length + ' opções</summary><div class="cr-subs">' + c.subs.map(function (x) { return '<div class="cr-card cr-subc"><b>' + esc(x.n) + src(x.src) + '</b>' + subInfo(x, false) + '</div>'; }).join('') + '</div></details></section>';
+      } else h += '<section class="cr-sec"><h3>' + esc(c.subN) + '</h3><p class="cr-mut sm">É escolhido no ' + c.subLv + 'º nível. Dá para conhecer as opções desde já:</p><details class="cr-det"><summary>Ver as ' + c.subs.length + ' opções</summary><div class="cr-subs">' + c.subs.map(function (x) { return '<div class="cr-card cr-subc"><b>' + esc(x.n) + src(x.src) + '</b>' + subInfo(x, false) + more('sub', c.k, x.k) + '</div>'; }).join('') + '</div></details></section>';
     } else {
       h += '<section class="cr-sec"><h3>Classe</h3><div class="cr-grid' + gimg() + '">' + D.classes.map(function (x) { return artCard('data-ca="cls" data-k="' + x.k + '"', art('cls', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(x.desc) + '</span><small>d' + x.hd + ' · ' + ATN[x.pa] + '</small>'); }).join('') + '</div></section>';
     }
@@ -513,7 +513,7 @@
       const L = D.races.filter(function (x) { return !q || fold(x.n + ' ' + x.subs.map(function (s) { return s.n; }).join(' ')).indexOf(q) >= 0; });
       const card = function (x) {
         const a = x.flex ? '+2/+1 livres' : asiTxt(x.asi);
-        return artCard('data-ca="race" data-k="' + x.k + '"', art('race', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(a) + (x.subs.length > 1 ? ' · ' + x.subs.length + ' variações' : '') + '</span>');
+        return artCard('data-ca="race" data-k="' + x.k + '"', art('race', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(a) + (x.subs.length > 1 ? ' · ' + x.subs.length + ' variações' : '') + '</span>' + (x.res ? '<span class="cr-rres">' + esc(x.res) + '</span>' : ''));
       };
       return '<section class="cr-sec"><h3>Raça</h3><input type="search" class="cr-in" data-cf="q" placeholder="Buscar: elfo, anão, tiefling, goliath…" value="' + esc(S.q) + '" autocomplete="off">' + RGRP.map(function (g) {
         const M = L.filter(function (x) { return raceGroup(x.k) === g; });
@@ -524,6 +524,7 @@
     const s = SR();
     const ra = art('race', r.k, s && s.k), rg = raceGroup(r.k);
     let h = '<section class="cr-sec cr-pick' + (ra ? ' cr-hasart' : '') + '">' + artFig(ra, s && r.subs.length > 1 ? s.n : r.n) + '<div class="cr-artbody"><div class="cr-row"><h3>' + esc(r.n) + src(r.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="race">Trocar</button></div>';
+    if (r.res) h += '<p class="sm">' + esc(r.res) + ' ' + more('race', r.k) + '</p>';
     if (rg[3]) h += '<p class="cr-note cr-grp-' + rg[3] + '"><b>' + esc(rg[4]) + '.</b> ' + esc(rg[2]) + '</p>';
     if (r.subs.length > 1) h += '<div class="cr-chips cr-wrap">' + r.subs.map(function (x) { return chip('data-ca="sr" data-k="' + x.k + '"', esc(x.n) + src(x.src), s && s.k === x.k); }).join('') + '</div>';
     h += raceMeta();
@@ -595,7 +596,7 @@
     if (!b) return '<section class="cr-sec"><h3>Antecedente</h3><p class="cr-mut sm">De onde o personagem vem. Dá duas perícias, ferramentas ou idiomas, equipamento e uma característica.</p><div class="cr-subs">' + D.bgs.map(function (x) { return '<button type="button" class="cr-card cr-subc" data-ca="bg" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b>' + (x.lore ? '<span class="cr-lore">' + esc(x.lore) + '</span>' : '') + '<span class="cr-jogo"><b>Perícias:</b> ' + esc(x.sk.map(function (k) { return SKN[k]; }).concat(x.skch ? ['+' + x.skch[0] + ' à escolha'] : []).join(', ')) + '</span></button>'; }).join('') + '</div></section>';
     const tl = b.tool.map(function (t) { return t.indexOf('ch:') === 0 ? { artesao: 'uma ferramenta de artesão', instrumento: 'um instrumento musical', jogo: 'um jogo' }[t.slice(3)] : t; });
     return '<section class="cr-sec cr-pick"><div class="cr-artbody"><div class="cr-row"><h3>' + esc(b.n) + src(b.src) + '</h3><button type="button" class="cr-btn q sm" data-ca="clr" data-k="bg">Trocar</button></div>' +
-      (b.lore ? '<p class="sm">' + esc(b.lore) + '</p><p class="cr-jogo"><b>No roleplay:</b> ' + esc(b.rp) + '</p>' : '') +
+      (b.lore ? '<p class="sm">' + esc(b.lore) + '</p><p class="cr-jogo"><b>No roleplay:</b> ' + esc(b.rp) + '</p><p>' + more('bg', b.k) + '</p>' : '') +
       '<p class="cr-tags"><span>Perícias: ' + esc(b.sk.map(function (k) { return SKN[k]; }).join(', ') + (b.skch ? (b.sk.length ? ' + ' : '') + b.skch[0] + ' à escolha' : '')) + '</span>' + (tl.length ? '<span>Ferramentas: ' + esc(tl.join(', ')) + '</span>' : '') + (b.lang ? '<span>' + b.lang + ' idioma' + (b.lang > 1 ? 's' : '') + '</span>' : '') + '</p>' +
       '<ul class="cr-fl"><li><div><b>' + esc(b.fn) + '</b> ' + esc(b.fd) + '</div></li></ul><p class="cr-mut sm">Equipamento: ' + esc(b.eq.map(function (e) { return e.replace(/^@ferramenta$/, 'ferramenta escolhida').replace(/^@instrumento$/, 'instrumento escolhido').replace(/\*(\d+)$/, ' ×$1'); }).join(', ')) + ' e ' + b.po + ' po.</p>' +
       '<label class="cr-lab">Tendência <select class="cr-in" data-cs="align"><option value="">—</option>' + ALIGN.map(function (a) { return '<option' + (S.align === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></label></div></section>';
@@ -786,6 +787,8 @@
   function draft() { try { localStorage.setItem('ht-cr-draft', JSON.stringify(S)); } catch (e) { /* ok */ } }
   function toggle(arr, k, max) { const i = arr.indexOf(k); if (i >= 0) arr.splice(i, 1); else if (max == null || arr.length < max) arr.push(k); }
   function onClick(e) {
+    const cpo = e.target.closest('[data-cpo]');
+    if (cpo && root.contains(cpo)) { compendio(cpo.dataset.cpo, cpo.dataset.k, cpo.dataset.s); return; }
     const b = e.target.closest('[data-ca]');
     if (!b || !root.contains(b) || b.disabled) return;
     const a = b.dataset.ca, k = b.dataset.k, v = b.dataset.v;
@@ -947,8 +950,110 @@
     if (cb) cb(res);
   }
 
+  /* ---------- compêndio: página completa de cada classe, subclasse, raça e antecedente (textos próprios + link para o texto oficial) ---------- */
+  let croot = null, CP = null;
+  const DDB = function (en) { return 'https://www.dndbeyond.com/search?q=' + encodeURIComponent(en); };
+  const enOf = function (n, en) { if (en) return en; const m = /\(([^)]+)\)\s*$/.exec(n); return m ? m[1] : n; };
+  const ptOf = function (n) { return String(n).replace(/\s*\([^)]*\)\s*$/, ''); };
+  function more(kind, k, s, lbl) { return '<button type="button" class="cr-more" data-cpo="' + kind + '" data-k="' + esc(k) + '"' + (s ? ' data-s="' + esc(s) + '"' : '') + '>' + (lbl || 'Ler mais') + ' →</button>'; }
+  function cpOff(en) { return '<a class="cr-off" href="' + esc(DDB(en)) + '" target="_blank" rel="noopener noreferrer">Ler o texto oficial no D&amp;D Beyond ↗</a><p class="cr-mut xs">O texto oficial dos livros é da Wizards of the Coast e não é reproduzido aqui. Os resumos abaixo foram escritos para o Hollow Table; as características seguem as regras de 2014.</p>'; }
+  function cpParas(L) { return (L || []).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join(''); }
+  function cpQs(L, t) { return L && L.length ? '<h4>' + (t || 'Ideias para o roleplay') + '</h4><ul class="cr-qs">' + L.map(function (q) { return '<li>' + esc(q) + '</li>'; }).join('') + '</ul>' : ''; }
+  function cpFeats(list) { return feats(list.slice().sort(function (a, b) { return a[0] - b[0]; }), 20); }
+  function cpClass(c) {
+    const a = art('cls', c.k);
+    let h = '<header class="cr-cph' + (a ? ' cr-hasart' : '') + '">' + artFig(a, c.n) + '<div class="cr-artbody"><small class="cr-kick">Classe' + src(c.src) + '</small><h2>' + esc(ptOf(c.n)) + ' <i>' + esc(enOf(c.n, c.en)) + '</i></h2>' + cpParas(c.lore) +
+      '<p class="cr-tags"><span>d' + c.hd + ' de vida</span><span>Principal: ' + ATN[c.pa] + '</span><span>Salvaguardas: ' + c.sv.map(function (x) { return ATN[x]; }).join(' e ') + '</span></p>' + cpOff(enOf(c.n, c.en)) + '</div></header>';
+    h += '<section class="cr-sec"><h3>Como joga</h3><p>' + esc(c.jogo || c.desc) + '</p><p class="cr-mut sm">' + esc(c.prof) + '</p>' + cpQs(c.rp) + '</section>';
+    const cols = c.col || [];
+    h += '<section class="cr-sec"><h3>Progressão</h3><div class="cr-tw"><table class="cr-tb"><thead><tr><th>Nível</th><th>Prof.</th>' + cols.map(function (x) { return '<th>' + esc(x[0]) + '</th>'; }).join('') + '<th>Características</th></tr></thead><tbody>' +
+      Array.from({ length: 20 }, function (_, i) { const l = i + 1, fs = c.f.filter(function (f) { return f[0] === l; }).map(function (f) { return f[1]; }); if (l === c.subLv) fs.unshift(c.subN); return '<tr><td>' + l + 'º</td><td>+' + (2 + Math.floor(i / 4)) + '</td>' + cols.map(function (x) { return '<td>' + esc(x[1][i]) + '</td>'; }).join('') + '<td>' + esc(uniq(fs).join(', ') || '—') + '</td></tr>'; }).join('') + '</tbody></table></div></section>';
+    h += '<section class="cr-sec"><h3>Características</h3>' + cpFeats(c.f) + '</section>';
+    h += '<section class="cr-sec"><h3>' + esc(c.subN) + ' <small class="cr-mut">no ' + c.subLv + 'º nível</small></h3><div class="cr-subs">' + c.subs.map(function (x) { return '<button type="button" class="cr-card cr-subc" data-cpo="sub" data-k="' + c.k + '" data-s="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b>' + (x.lore ? '<span class="cr-lore">' + esc(x.lore) + '</span>' : '') + '<span class="cr-more">Abrir →</span></button>'; }).join('') + '</div></section>';
+    return h;
+  }
+  function cpSub(c, s) {
+    let h = '<header class="cr-cph"><div class="cr-artbody"><small class="cr-kick">' + esc(c.subN) + ' · <button type="button" class="cr-link" data-cpo="cls" data-k="' + c.k + '">' + esc(ptOf(c.n)) + '</button>' + src(s.src) + '</small><h2>' + esc(ptOf(s.n)) + ' <i>' + esc(enOf(s.n)) + '</i></h2>' +
+      (s.lore ? '<p>' + esc(s.lore) + '</p>' : '') + (s.tags && s.tags.length ? '<span class="cr-stags">' + s.tags.map(function (t) { return '<i>' + esc(t) + '</i>'; }).join('') + '</span>' : '') + cpOff(enOf(s.n) + ' ' + enOf(c.n, c.en)) + '</div></header>';
+    if (s.jogo) h += '<section class="cr-sec"><h3>Como joga</h3><p>' + esc(s.jogo) + '</p>' + (s.hint ? '<p class="cr-mut sm">' + esc(s.hint) + '</p>' : '') + '</section>';
+    h += '<section class="cr-sec"><h3>Características</h3>' + cpFeats(s.f) + '</section>';
+    const o = c.subs.filter(function (x) { return x.k !== s.k; });
+    h += '<section class="cr-sec"><h3>Outras opções de ' + esc(ptOf(c.n)) + '</h3><div class="cr-chips cr-wrap">' + o.map(function (x) { return '<button type="button" class="cr-chip" data-cpo="sub" data-k="' + c.k + '" data-s="' + x.k + '">' + esc(ptOf(x.n)) + '</button>'; }).join('') + '</div></section>';
+    return h;
+  }
+  function cpRace(r) {
+    const a = art('race', r.k), sz = { P: 'Pequeno', M: 'Médio' }[r.sz] || r.sz, rg = raceGroup(r.k);
+    const t = ['Tamanho ' + sz, 'Deslocamento ' + mfmt(r.spd)]; if (r.dv) t.push('Visão no escuro ' + r.dv + ' m');
+    let h = '<header class="cr-cph' + (a ? ' cr-hasart' : '') + '">' + artFig(a, r.n) + '<div class="cr-artbody"><small class="cr-kick">Raça' + src(r.src) + '</small><h2>' + esc(ptOf(r.n)) + ' <i>' + esc(enOf(r.n, r.en)) + '</i></h2>' + cpParas(r.lore) +
+      (rg[3] ? '<p class="cr-note cr-grp-' + rg[3] + '"><b>' + esc(rg[4]) + '.</b> ' + esc(rg[2]) + '</p>' : '') +
+      '<p class="cr-tags">' + t.map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('') + '<span>Atributos: ' + esc(r.flex ? '+2/+1 livres' : asiTxt(r.asi) || 'veja a variação') + '</span></p>' + cpOff(enOf(r.n, r.en)) + '</div></header>';
+    h += '<section class="cr-sec"><h3>Traços</h3><ul class="cr-fl">' + traitList(r) + '</ul>' + cpQs(r.rp) + '</section>';
+    const subs = r.subs.filter(function (s) { return (s.tr && s.tr.length) || s.asi; });
+    if (r.subs.length > 1 && subs.length) h += '<section class="cr-sec"><h3>Variações</h3>' + subs.map(function (s) { const sa = art('race', r.k, s.k); return '<div class="cr-blk"><b>' + esc(s.n) + src(s.src) + (s.asi ? ' <small class="cr-mut">' + esc(asiTxt(s.asi)) + '</small>' : '') + '</b>' + (sa && sa !== a ? '<img class="cr-sthumb" src="' + esc(ARTE + sa.p) + '" alt="" loading="lazy">' : '') + '<ul class="cr-fl">' + traitList(s) + '</ul>' + (s.dmg ? '<p class="cr-mut sm">Sopro: ' + esc(s.dmg) + ', ' + esc(s.br) + '.</p>' : '') + '</div>'; }).join('') + '</section>';
+    return h;
+  }
+  function cpBg(b) {
+    const tl = b.tool.map(function (t) { return t.indexOf('ch:') === 0 ? { artesao: 'uma ferramenta de artesão', instrumento: 'um instrumento musical', jogo: 'um jogo' }[t.slice(3)] : t; });
+    let h = '<header class="cr-cph"><div class="cr-artbody"><small class="cr-kick">Antecedente' + src(b.src) + '</small><h2>' + esc(ptOf(b.n)) + ' <i>' + esc(enOf(b.n)) + '</i></h2><p>' + esc(b.lore) + '</p>' + cpOff(enOf(b.n) + ' background') + '</div></header>';
+    h += '<section class="cr-sec"><h3>No roleplay</h3><p>' + esc(b.rp) + '</p></section>';
+    h += '<section class="cr-sec"><h3>O que ele dá</h3><p class="cr-tags"><span>Perícias: ' + esc(b.sk.map(function (k) { return SKN[k]; }).join(', ') + (b.skch ? (b.sk.length ? ' + ' : '') + b.skch[0] + ' à escolha' : '')) + '</span>' + (tl.length ? '<span>Ferramentas: ' + esc(tl.join(', ')) + '</span>' : '') + (b.lang ? '<span>' + b.lang + ' idioma' + (b.lang > 1 ? 's' : '') + '</span>' : '') + '</p>' +
+      '<ul class="cr-fl"><li><div><b>' + esc(b.fn) + '</b> ' + esc(b.fd) + '</div></li></ul><p class="cr-mut sm">Equipamento: ' + esc(b.eq.map(function (e) { return e.replace(/^@ferramenta$/, 'ferramenta escolhida').replace(/^@instrumento$/, 'instrumento escolhido').replace(/\*(\d+)$/, ' ×$1'); }).join(', ')) + ' e ' + b.po + ' po.</p></section>';
+    return h;
+  }
+  function cpIndex() {
+    const q = fold(CP.q), tab = CP.tab;
+    const hit = function (n, extra) { return !q || fold(n + ' ' + (extra || '')).indexOf(q) >= 0; };
+    let h = '<div class="cr-seg">' + [['cls', 'Classes'], ['race', 'Raças'], ['bg', 'Antecedentes']].map(function (t) { return '<button type="button" data-cpt="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>'; }).join('') + '</div>' +
+      '<input type="search" class="cr-in" data-cpq="1" placeholder="Buscar no compêndio…" value="' + esc(CP.q) + '" autocomplete="off">';
+    if (tab === 'cls') h += D.classes.filter(function (c) { return hit(c.n, c.subs.map(function (s) { return s.n; }).join(' ')); }).map(function (c) {
+      return '<section class="cr-sec"><div class="cr-row"><h3>' + esc(c.n) + src(c.src) + '</h3>' + more('cls', c.k, '', 'Abrir classe') + '</div><p class="cr-mut sm">' + esc(c.res || c.desc) + '</p><div class="cr-chips cr-wrap">' + c.subs.filter(function (s) { return !q || hit(c.n + ' ' + s.n); }).map(function (s) { return '<button type="button" class="cr-chip" data-cpo="sub" data-k="' + c.k + '" data-s="' + s.k + '">' + esc(ptOf(s.n)) + '</button>'; }).join('') + '</div></section>';
+    }).join('');
+    if (tab === 'race') h += '<div class="cr-grid' + gimg() + '">' + D.races.filter(function (r) { return hit(r.n, r.subs.map(function (s) { return s.n; }).join(' ')); }).map(function (r) { return artCard('data-cpo="race" data-k="' + r.k + '"', art('race', r.k), '<b>' + esc(r.n) + src(r.src) + '</b><span>' + esc(r.res || '') + '</span>'); }).join('') + '</div>';
+    if (tab === 'bg') h += '<div class="cr-subs">' + D.bgs.filter(function (b) { return hit(b.n); }).map(function (b) { return '<button type="button" class="cr-card cr-subc" data-cpo="bg" data-k="' + b.k + '"><b>' + esc(b.n) + src(b.src) + '</b><span class="cr-lore">' + esc(b.lore) + '</span></button>'; }).join('') + '</div>';
+    return h;
+  }
+  function cpPaint(keep) {
+    if (!croot) return;
+    const body = croot.querySelector('.cr-body'), y = body.scrollTop, p = CP.page;
+    let h = '';
+    if (!p) h = cpIndex();
+    else if (p.kind === 'cls') h = cpClass(IX.cls[p.k]);
+    else if (p.kind === 'sub') { const c = IX.cls[p.k]; h = cpSub(c, c.subs.filter(function (x) { return x.k === p.s; })[0]); }
+    else if (p.kind === 'race') h = cpRace(IX.race[p.k]);
+    else if (p.kind === 'bg') h = cpBg(IX.bg[p.k]);
+    body.innerHTML = h + FAN;
+    croot.querySelector('[data-cpa="back"]').hidden = !CP.hist.length && !p;
+    body.scrollTop = keep ? y : 0;
+    if (!keep && croot !== document.activeElement && !croot.contains(document.activeElement)) croot.focus();
+  }
+  function cpGo(page) { if (CP.page || CP.hist.length) CP.hist.push(CP.page); CP.page = page; cpPaint(false); }
+  function compendio(kind, k, s) {
+    index(); artLoad();
+    CP = { tab: kind === 'race' || kind === 'bg' ? kind : 'cls', q: '', page: kind ? { kind: kind, k: k, s: s } : null, hist: [] };
+    if (!document.getElementById('cr-css')) { const st = document.createElement('style'); st.id = 'cr-css'; st.textContent = CSS; document.head.appendChild(st); }
+    if (croot) croot.remove();
+    croot = document.createElement('div');
+    croot.className = 'cr-ov cr-cp'; croot.setAttribute('role', 'dialog'); croot.setAttribute('aria-modal', 'true'); croot.setAttribute('aria-label', 'Compêndio');
+    croot.innerHTML = '<div class="cr-top"><button type="button" class="cr-x" data-cpa="back" aria-label="Voltar">←</button><h2><small>D&D 5e · regras de 2014</small>Compêndio</h2><button type="button" class="cr-btn q sm" data-cpa="home">Índice</button><button type="button" class="cr-x" data-cpa="close" aria-label="Fechar">✕</button></div><div class="cr-body"></div>';
+    document.body.appendChild(croot);
+    const po = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    const esck = function (e) { if (e.key === 'Escape') { e.stopPropagation(); shut(); } };
+    const shut = function () { if (!croot) return; const back = root && root.querySelector('[data-cpo]'); croot.remove(); croot = null; document.removeEventListener('keydown', esck, true); document.body.style.overflow = root ? 'hidden' : po; if (back) back.focus(); };
+    document.addEventListener('keydown', esck, true);
+    croot.addEventListener('click', function (e) {
+      const a = e.target.closest('[data-cpa]'), o = e.target.closest('[data-cpo]'), t = e.target.closest('[data-cpt]');
+      if (a) { const v = a.dataset.cpa; if (v === 'close') shut(); else if (v === 'home') { CP.hist = []; CP.page = null; cpPaint(false); } else if (v === 'back') { if (CP.hist.length) { CP.page = CP.hist.pop(); cpPaint(false); } else if (CP.page) { CP.page = null; cpPaint(false); } } return; }
+      if (o) { cpGo({ kind: o.dataset.cpo, k: o.dataset.k, s: o.dataset.s }); return; }
+      if (t) { CP.tab = t.dataset.cpt; cpPaint(true); }
+    });
+    croot.addEventListener('input', function (e) { if (!e.target.dataset.cpq) return; CP.q = e.target.value; const pos = e.target.selectionStart; cpPaint(true); const n = croot.querySelector('[data-cpq]'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { /* ok */ } } });
+    croot.setAttribute('tabindex', '-1');
+    cpPaint(false);
+    croot.focus();
+  }
+
   /* ---------- abrir/fechar ---------- */
-  const CSS = '.cr-ov{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}' +
+  const CSS ='.cr-ov{position:fixed;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}' +
     '.cr-top{display:flex;align-items:center;gap:12px;padding:12px max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));max-width:920px;width:100%;margin:0 auto}' +
     '.cr-top h2{flex:1;font-size:19px}.cr-top h2 small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}' +
     '.cr-steps{display:flex;gap:6px;overflow-x:auto;padding:4px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));max-width:920px;width:100%;margin:0 auto;scrollbar-width:none}' +
@@ -1011,6 +1116,13 @@
     '.cr-gi img,.cr-gi0{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#ece8e1}.cr-gi0{background:var(--surface-2)}' +
     '.cr-gi figcaption{display:grid;gap:3px;padding:8px 10px 10px;min-width:0}.cr-gi b{font-size:14px;color:var(--fg)}.cr-gi span{font-size:12.5px;color:var(--muted);line-height:1.35}.cr-gi small{font-size:11px;color:var(--muted);opacity:.8}.cr-gi small a{color:inherit}' +
     '@media(max-width:620px){.cr-hasart{grid-template-columns:minmax(0,1fr)}.cr-art img{aspect-ratio:auto;max-height:300px}}' +
+    '.cr-more{background:none;border:0;padding:0;font:inherit;font-size:14px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}.cr-subc .cr-more,.cr-card .cr-more{justify-self:start}' +
+    '.cr-cp{z-index:45}.cr-cph{display:grid;gap:12px;margin:4px auto 14px}.cr-cph h2{font-family:var(--serif);font-size:26px;margin:0;line-height:1.15;text-wrap:balance}.cr-cph h2 i{font-style:normal;font-size:15px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em;margin-left:4px}.cr-cph p{margin:0;font-size:15.5px;line-height:1.6;max-width:68ch}' +
+    '.cr-kick{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.cr-kick .cr-link{font-size:inherit;letter-spacing:inherit;text-transform:inherit}' +
+    '.cr-off{justify-self:start;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent);border-radius:10px;padding:8px 12px;font-size:14px;text-decoration:none;min-height:40px}.cr-off:hover{background:var(--accent-soft)}' +
+    '.cr-sec>p{margin:0;line-height:1.55}.cr-sec h4{margin:4px 0 0;font-size:14px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;font-weight:400}.cr-qs{margin:0;padding-left:20px;display:grid;gap:4px;font-size:15px;line-height:1.45}' +
+    '.cr-tw{overflow-x:auto;-webkit-overflow-scrolling:touch}.cr-tb{border-collapse:collapse;font-size:13.5px;width:100%;min-width:520px}.cr-tb th,.cr-tb td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}.cr-tb th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:400;text-transform:uppercase}.cr-tb td:first-child,.cr-tb td:nth-child(2){font-family:var(--mono);white-space:nowrap;color:var(--accent)}' +
+    '.cr-sthumb{width:72px;height:72px;object-fit:cover;object-position:50% 15%;border-radius:8px;border:1px solid var(--line)}.cr-rres{display:none}.cr-grid:not(.cr-gimg) .cr-rres{display:block;font-size:13px}' +
     '.cr-warn{border-color:rgba(255,184,107,.5)}.cr-warn ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:15px}.cr-link{background:none;border:0;color:var(--accent);font:inherit;padding:0;cursor:pointer;text-decoration:underline}';
   function open(o) {
     index();
@@ -1029,13 +1141,13 @@
     if (!document.getElementById('cr-css')) { const s = document.createElement('style'); s.id = 'cr-css'; s.textContent = CSS; document.head.appendChild(s); }
     root = document.createElement('div');
     root.className = 'cr-ov'; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Criar personagem');
-    root.innerHTML = '<div class="cr-top"><h2><small>D&D 5e · regras de 2014</small>Criar personagem</h2><button type="button" class="cr-btn q sm" data-ca="reset">Recomeçar</button><button type="button" class="cr-x" data-ca="close" aria-label="Fechar">✕</button></div><nav class="cr-steps" aria-label="Etapas"></nav><div class="cr-body"></div><div class="cr-foot"></div>';
+    root.innerHTML = '<div class="cr-top"><h2><small>D&D 5e · regras de 2014</small>Criar personagem</h2><button type="button" class="cr-btn q sm" data-cpo="">Compêndio</button><button type="button" class="cr-btn q sm" data-ca="reset">Recomeçar</button><button type="button" class="cr-x" data-ca="close" aria-label="Fechar">✕</button></div><nav class="cr-steps" aria-label="Etapas"></nav><div class="cr-body"></div><div class="cr-foot"></div>';
     document.body.appendChild(root);
     prevOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden';
     root.addEventListener('click', function (e) { const b = e.target.closest('[data-ca="reset"]'); if (b) { if (b.dataset.sure) { const nm = S.name; S = fresh(); S.name = nm; paint(false); } else { b.dataset.sure = '1'; b.textContent = 'Tem certeza?'; setTimeout(function () { if (b.isConnected) { delete b.dataset.sure; b.textContent = 'Recomeçar'; } }, 3000); } return; } onClick(e); });
     root.addEventListener('change', onChange);
     root.addEventListener('input', onInput);
-    root.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    root.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !croot) close(); });
     paint(false);
   }
   function close() {
@@ -1044,5 +1156,5 @@
     document.body.style.overflow = prevOverflow;
     const cb = window.HTCriador._close; if (cb) cb();
   }
-  window.HTCriador = { open: open, close: close, hasItems: false, _apply: null, _close: null, _state: function () { return S; } };
+  window.HTCriador = { open: open, close: close, compendio: compendio, hasItems: false, _apply: null, _close: null, _state: function () { return S; } };
 })();
