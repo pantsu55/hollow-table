@@ -92,7 +92,7 @@
     h += '<section class="cr-sec cr-pick' + (a ? ' cr-hasart' : '') + '">' + artFig(a, c.n) + '<div class="cr-artbody"><h3>' + both(c) + '</h3><p class="sm">' + esc(c.d) + '</p>' +
       '<p class="cr-tags"><span>Domínios <b>' + esc(c.dom.map(function (d) { return D.doms[d]; }).join(' e ')) + '</b></span><span>Evasão <b>' + c.ev + '</b></span><span>Pontos de Vida <b>' + c.hp + '</b></span></p>' +
       '<div class="cr-blk"><b>Característica de Esperança</b>' + feats([c.hope]) + '</div><div class="cr-blk"><b>Características da classe</b>' + feats(c.f) + '</div>' +
-      '<div class="cr-blk"><b>Subclasse</b><div class="cr-opts">' + c.subs.map(function (k) { const s = IX.s[k]; return '<button type="button" class="cr-opt" data-ca="sub" data-k="' + k + '" aria-pressed="' + (S.sub === k) + '"><b>' + both(s) + '</b><span>' + esc(s.d) + (s.sp ? ' Conjuração: ' + TRN[s.sp] + '.' : '') + '</span></button>'; }).join('') + '</div>' +
+      '<div class="cr-blk"><b>Subclasse</b><div class="cr-opts">' + c.subs.map(function (k) { const s = IX.s[k], sa = art('dh-s-' + k); return '<button type="button" class="cr-opt' + (sa ? ' cr-has' : '') + '" data-ca="sub" data-k="' + k + '" aria-pressed="' + (S.sub === k) + '">' + (sa ? '<span class="cr-cimg"><img src="' + esc(ARTE + sa.p) + '" alt="" loading="lazy" decoding="async"></span>' : '') + '<span class="cr-ctx"><b>' + both(s) + '</b><span>' + esc(s.d) + (s.sp ? ' Conjuração: ' + TRN[s.sp] + '.' : '') + '</span></span></button>'; }).join('') + '</div>' +
       (SUB() ? feats(SUB().f) : '') + '</div></div></section>';
     return h;
   }
@@ -177,7 +177,7 @@
       (STEPS.some(function (x) { return issues(x[0]).length; }) ? '<ul class="sm cr-bad">' + STEPS.map(function (x) { return issues(x[0]).map(function (t) { return '<li>' + esc(x[1]) + ': ' + esc(t) + '</li>'; }).join(''); }).join('') + '</ul>' : '') + '</section>';
     return h;
   }
-  const FAN = '<p class="cr-fan">Conteúdo do Daggerheart SRD 1.0 © Critical Role LLC, usado sob a Darrington Press Community Gaming License. Arte oficial de Daggerheart usada com autorização da Darrington Press. Não é um produto oficial.</p>';
+  const FAN = '<p class="cr-fan">Conteúdo do Daggerheart SRD 1.0 © Critical Role LLC, usado sob a Darrington Press Community Gaming License. Arte oficial de Daggerheart (Darrington Press) usada com autorização. Não é um produto oficial.</p>';
   function hStep() { const k = STEPS[S.step][0]; return { classe: hClasse, heranca: hHeranca, tracos: hTracos, equip: hEquip, exp: hExp, cartas: hCartas, fim: hFim }[k](); }
 
   function paint(keepScroll) {
@@ -293,12 +293,12 @@
     '.cr-fan{margin:28px 0 4px;font-size:11px;line-height:1.4;color:var(--muted);opacity:.8}' +
     '.cr-sec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;margin-bottom:12px;min-width:0}.cr-sec h3{font-family:var(--serif);font-size:17px;margin:0;letter-spacing:.03em}.cr-pick{border-color:rgba(167,139,250,.55)}' +
     '.cr-row{display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}' +
-    '.cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}.cr-gimg{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}' +
+    '.cr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}.cr-gimg{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}' +
     '.cr-card,.cr-opt{text-align:left;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:12px;padding:12px;font:inherit;cursor:pointer;display:grid;gap:4px;align-content:start;min-width:0}' +
     '.cr-card span,.cr-opt span{font-size:14px;color:var(--muted);line-height:1.4}.cr-card:hover,.cr-opt:hover{border-color:#5a5390}.cr-card.cr-on{border-color:var(--accent);background:var(--accent-soft)}.cr-card.cr-on b{color:var(--accent)}' +
     '.cr-opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}.cr-opt[aria-pressed="true"] b{color:var(--accent)}' +
     '.cr-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}.cr-opts.sm{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}' +
-    '.cr-card.cr-has{padding:0;overflow:hidden;gap:0}.cr-card .cr-cimg{display:block;aspect-ratio:3/4;background:var(--surface-2);overflow:hidden}.cr-card .cr-cimg img{width:100%;height:100%;object-fit:cover;object-position:50% 15%;display:block}' +
+    '.cr-card.cr-has,.cr-opt.cr-has{padding:0;overflow:hidden;gap:0}.cr-card .cr-cimg,.cr-opt .cr-cimg{display:block;aspect-ratio:5/4;background:var(--surface-2);overflow:hidden}.cr-card .cr-cimg img,.cr-opt .cr-cimg img{width:100%;height:100%;object-fit:cover;object-position:50% 30%;display:block}.cr-opt.cr-has .cr-ctx{display:grid;gap:4px;padding:10px 12px 12px}.cr-opt .cr-ctx span{font-size:14px;color:var(--muted);line-height:1.4}' +
     '.cr-card .cr-ctx{display:grid;gap:4px;align-content:start;color:var(--fg)}.cr-card.cr-has .cr-ctx{padding:10px 12px 12px}.cr-card .cr-ctx span{font-size:13px}.cr-card small.cr-by{font-size:11px;opacity:.75;color:var(--muted)}' +
     '.cr-en{font-weight:400;font-size:12px;color:var(--muted)}' +
     '.cr-chip{display:inline-flex;align-items:center;background:var(--bg);border:1px solid var(--line);color:var(--muted);border-radius:999px;font:inherit;font-size:14px;min-height:40px;padding:0 14px;cursor:pointer}.cr-chip[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}' +
@@ -320,8 +320,8 @@
     '.cr-sp details{flex:1;min-width:0}.cr-sp summary{cursor:pointer;list-style:none;display:grid;gap:2px}.cr-sp summary::-webkit-details-marker{display:none}.cr-sp p{margin:6px 0 2px;font-size:15px;color:var(--fg);line-height:1.45}' +
     '.cr-tag2{font-family:var(--mono);font-size:10px;color:var(--ok);letter-spacing:.04em}' +
     '.cr-sum{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}.cr-sum div{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:2px;align-content:start}.cr-sum div:first-child{grid-column:span 2}.cr-sum span{font-size:12px;color:var(--muted);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}' +
-    '.cr-hasart{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:14px;align-items:start}.cr-artbody{display:grid;gap:10px;min-width:0}' +
-    '.cr-art{margin:0;display:grid;gap:4px;min-width:0}.cr-art img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:50% 15%;border-radius:10px;border:1px solid var(--line);display:block;background:var(--surface-2)}.cr-art figcaption{font-size:11px;color:var(--muted);line-height:1.3}.cr-art figcaption a{color:inherit}' +
+    '.cr-hasart{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:14px;align-items:start}.cr-artbody{display:grid;gap:10px;min-width:0}' +
+    '.cr-art{margin:0;display:grid;gap:4px;min-width:0}.cr-art img{width:100%;aspect-ratio:5/4;object-fit:cover;object-position:50% 30%;border-radius:10px;border:1px solid var(--line);display:block;background:var(--surface-2)}.cr-art figcaption{font-size:11px;color:var(--muted);line-height:1.3}.cr-art figcaption a{color:inherit}' +
     '@media(max-width:620px){.cr-hasart{grid-template-columns:minmax(0,1fr)}.cr-art img{aspect-ratio:auto;max-height:300px}}' +
     '.cr-note{margin:0;font-size:14px;line-height:1.45;color:var(--muted);border-left:3px solid var(--line);padding:4px 0 4px 10px}.cr-link{background:none;border:0;color:var(--accent);font:inherit;padding:0;cursor:pointer;text-decoration:underline;justify-self:start}';
   function open(o) {
