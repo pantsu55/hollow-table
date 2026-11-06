@@ -481,14 +481,19 @@
       if (S.lvl >= c.subLv) {
         const s = SUB();
         h += '<section class="cr-sec"><h3>' + esc(c.subN) + '</h3>';
-        if (s) h += '<div class="cr-pick"><div class="cr-row"><b>' + esc(s.n) + src(s.src) + '</b><button type="button" class="cr-btn q sm" data-ca="clr" data-k="sub">Trocar</button></div>' + (s.hint ? '<p class="cr-mut sm">' + esc(s.hint) + '</p>' : '') + feats(s.f, S.lvl) + '</div>';
-        else h += '<div class="cr-grid">' + c.subs.map(function (x) { return '<button type="button" class="cr-card" data-ca="sub" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b><span>' + esc((x.f[0] || [0, '', ''])[1]) + '</span></button>'; }).join('') + '</div>';
+        if (s) h += '<div class="cr-pick cr-subp"><div class="cr-row"><b>' + esc(s.n) + src(s.src) + '</b><button type="button" class="cr-btn q sm" data-ca="clr" data-k="sub">Trocar</button></div>' + subInfo(s, true) + (s.hint ? '<p class="cr-mut sm">' + esc(s.hint) + '</p>' : '') + feats(s.f, S.lvl) + '</div>';
+        else h += '<p class="cr-mut sm">Leia as opções e toque na que combina com o personagem.</p><div class="cr-subs">' + c.subs.map(function (x) { return '<button type="button" class="cr-card cr-subc" data-ca="sub" data-k="' + x.k + '"><b>' + esc(x.n) + src(x.src) + '</b>' + subInfo(x, false) + '</button>'; }).join('') + '</div>';
         h += '</section>';
-      } else h += '<p class="cr-mut sm">' + esc(c.subN) + ' é escolhido no ' + c.subLv + 'º nível.</p>';
+      } else h += '<section class="cr-sec"><h3>' + esc(c.subN) + '</h3><p class="cr-mut sm">É escolhido no ' + c.subLv + 'º nível. Dá para conhecer as opções desde já:</p><details class="cr-det"><summary>Ver as ' + c.subs.length + ' opções</summary><div class="cr-subs">' + c.subs.map(function (x) { return '<div class="cr-card cr-subc"><b>' + esc(x.n) + src(x.src) + '</b>' + subInfo(x, false) + '</div>'; }).join('') + '</div></details></section>';
     } else {
       h += '<section class="cr-sec"><h3>Classe</h3><div class="cr-grid' + gimg() + '">' + D.classes.map(function (x) { return artCard('data-ca="cls" data-k="' + x.k + '"', art('cls', x.k), '<b>' + esc(x.n) + src(x.src) + '</b><span>' + esc(x.desc) + '</span><small>d' + x.hd + ' · ' + ATN[x.pa] + '</small>'); }).join('') + '</div></section>';
     }
     return h;
+  }
+  /* descrição curta da subclasse: quem é (lore), como joga e etiquetas */
+  function subInfo(x, full) {
+    if (!x.lore) return '<span>' + esc((x.f[0] || [0, '', ''])[1]) + '</span>';
+    return '<span class="cr-lore">' + esc(x.lore) + '</span><span class="cr-jogo"><b>Como joga:</b> ' + esc(x.jogo) + '</span>' + (x.tags && x.tags.length ? '<span class="cr-stags">' + x.tags.map(function (t) { return '<i>' + esc(t) + '</i>'; }).join('') + '</span>' : '') + (full ? '' : '');
   }
   function traitList(o) { return (o.tr || []).map(function (t) { return '<li><div><b>' + esc(t[0]) + '</b> ' + esc(t[1]) + '</div></li>'; }).join(''); }
   function raceMeta() {
@@ -953,6 +958,9 @@
     '.cr-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}' +
     '.cr-body>*{max-width:888px;margin-left:auto;margin-right:auto}' +
     '.cr-foot{display:flex;align-items:center;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line);background:var(--surface);max-width:none}' +
+    '.cr-subs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}.cr-subc{gap:6px}.cr-subc .cr-lore{color:var(--fg);font-size:14px}.cr-jogo{font-size:13.5px;color:var(--muted);line-height:1.45}.cr-jogo b{color:var(--accent);font-weight:600}' +
+    '.cr-stags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}.cr-stags i{font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.03em;color:#c4b5fd;border:1px solid rgba(167,139,250,.4);border-radius:999px;padding:1px 8px}' +
+    '.cr-subp{display:grid;gap:8px}.cr-subp .cr-lore{font-size:15px}.cr-subp .cr-lore,.cr-subp .cr-jogo,.cr-subp .cr-stags{display:block}.cr-subp .cr-stags{display:flex}' +
     '.cr-fan{margin:28px 0 4px;font-size:11px;line-height:1.4;color:var(--muted,#8a8a99);opacity:.8}' +
     '.cr-foot .cr-iss{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '.cr-sec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;margin-bottom:12px;min-width:0}' +
