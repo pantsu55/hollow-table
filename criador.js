@@ -24,9 +24,8 @@
   const SUBART = { 'elfo:drow': 'drow', 'anao:duergar': 'duergar', 'elfo:eladrin': 'eladrin', 'elfo:mar': 'elfomar', 'elfo:shadarkai': 'shadarkai', 'gnomo:profundezas': 'gnomoprof', 'gith:githzerai': 'githzerai', 'genasi:ar': 'genasi-ar', 'genasi:terra': 'genasi-terra', 'genasi:fogo': 'genasi-fogo', 'genasi:agua': 'genasi-agua' };
   function artLoad() {
     if (artBusy) return;
-    let fresh = false;
-    try { const c = JSON.parse(localStorage.getItem('ht-arte') || 'null'); if (c && c.itens) { ART = c.itens; fresh = Date.now() - (c.at || 0) < 864e5; } } catch (e) { /* sem cache */ }
-    if (fresh) return;
+    /* mostra na hora o que já está guardado e confere a lista nova em segundo plano */
+    try { const c = JSON.parse(localStorage.getItem('ht-arte') || 'null'); if (c && c.itens) ART = c.itens; } catch (e) { /* sem cache */ }
     artBusy = true;
     fetch(ARTE + 'creditos.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.itens) return;
