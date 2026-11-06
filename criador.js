@@ -678,7 +678,7 @@
     const m = t.match(/^(.+?)\*(\d+)$/), nm = m ? m[1] : t, q = m ? ' ×' + m[2] : '';
     if (nm.charAt(0) === '#') return (D.packs[nm.slice(1)] || [nm])[0] + q;
     const cat = { '@simples': 'uma arma simples', '@simplesCaC': 'uma arma simples corpo a corpo', '@marcial': 'uma arma marcial', '@marcialCaC': 'uma arma marcial corpo a corpo', '@instrumento': 'um instrumento musical', '@ferramenta': 'a ferramenta escolhida' }[nm];
-    if (cat) return m ? cat.replace(/^uma? /, m[2] + ' ').replace('arma', 'armas').replace('instrumento musical', 'instrumentos') : cat;
+    if (cat) return m ? cat.replace(/^uma? /, m[2] + ' ').replace('arma', 'armas').replace('marcial', 'marciais').replace('instrumento musical', 'instrumentos') : cat;
     return nm + q;
   }
   function pickers(alt, key) {
@@ -996,7 +996,7 @@
     '.cr-art{margin:0;display:grid;gap:4px;min-width:0}.cr-art img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:50% 15%;border-radius:10px;border:1px solid var(--line);display:block;background:var(--surface-2)}' +
     '.cr-art figcaption{font-size:11px;color:var(--muted);line-height:1.3}.cr-art figcaption a{color:inherit}' +
     '.cr-oth{display:flex;gap:4px;margin-bottom:2px}.cr-oth img{width:44px;height:44px;object-fit:contain;background:#ece8e1;border-radius:8px;border:1px solid var(--line)}' +
-    '.cr-gear{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.cr-gi{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:grid;align-content:start;min-width:0}' +
+    '.cr-gear{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;align-items:start}.cr-gi{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:grid;align-content:start;min-width:0}' +
     '.cr-gi img,.cr-gi0{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#ece8e1}.cr-gi0{background:var(--surface-2)}' +
     '.cr-gi figcaption{display:grid;gap:3px;padding:8px 10px 10px;min-width:0}.cr-gi b{font-size:14px;color:var(--fg)}.cr-gi span{font-size:12.5px;color:var(--muted);line-height:1.35}.cr-gi small{font-size:11px;color:var(--muted);opacity:.8}.cr-gi small a{color:inherit}' +
     '@media(max-width:620px){.cr-hasart{grid-template-columns:minmax(0,1fr)}.cr-art img{aspect-ratio:auto;max-height:300px}}' +
