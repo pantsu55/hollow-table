@@ -63,7 +63,7 @@
     if (!L.length) return '';
     return '<div class="cr-blk"><span class="cr-mut xs">Armas e armaduras que você leva</span><div class="cr-gear">' + L.map(function (it) {
       const a = itemArt(it.n);
-      return '<figure class="cr-gi">' + (a ? '<img src="' + esc(ARTE + a.p) + '" alt="' + esc(it.n) + '" loading="lazy" decoding="async">' : '<span class="cr-gi0" aria-hidden="true"></span>') + '<figcaption><b>' + esc(it.n) + (it.q > 1 ? ' ×' + it.q : '') + '</b><span>' + esc(itemStat(it.n)) + '</span>' + (a ? '<small>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a></small>' : '') + '</figcaption></figure>';
+      return '<figure class="cr-gi">' + (a ? '<img src="' + esc(ARTE + a.p) + '" alt="' + esc(it.n) + '" loading="lazy" decoding="async">' : '') + '<figcaption><b>' + esc(it.n) + (it.q > 1 ? ' ×' + it.q : '') + '</b><span>' + esc(itemStat(it.n)) + '</span>' + (a ? '<small>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a></small>' : '') + '</figcaption></figure>';
     }).join('') + '</div></div>';
   }
   function artCard(attr, a, inner) {
