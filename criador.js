@@ -46,6 +46,27 @@
     return '<figure class="cr-art"><img src="' + esc(ARTE + a.p) + '" alt="' + esc(alt) + '" decoding="async"><figcaption>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a> · ArtStation</figcaption></figure>';
   }
   const gimg = function () { return ART ? ' cr-gimg' : ''; };
+  /* armas e armaduras: concept arts, chave "it-" + nome sem acentos */
+  const slug = function (t) { return fold(t).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); };
+  function itemArt(n) { return ART ? ART['it-' + slug(n)] || null : null; }
+  function itemStat(n) {
+    const w = IX.w[n], a = IX.a[n];
+    if (w) return w[2] + ' ' + w[3] + (w[7] ? ' · ' + w[7] : '');
+    if (a) return a[1] === 'escudo' ? '+' + a[2] + ' na CA' : 'CA ' + a[2] + (a[1] === 'leve' ? ' + Des' : a[1] === 'media' ? ' + Des (máx. 2)' : '') + (a[3] ? ' · For ' + a[3] : '') + (a[4] ? ' · desvantagem em Furtividade' : '');
+    return '';
+  }
+  function optThumbs(alt) {
+    const L = uniq(alt.map(function (t) { return t.replace(/\*\d+$/, ''); }).filter(function (n) { return (IX.w[n] || IX.a[n]) && itemArt(n); }));
+    return L.length ? '<span class="cr-oth">' + L.map(function (n) { return '<img src="' + esc(ARTE + itemArt(n).p) + '" alt="" loading="lazy" decoding="async">'; }).join('') + '</span>' : '';
+  }
+  function gearGallery() {
+    const seen = {}, L = eqItems().filter(function (it) { if (!(IX.w[it.n] || IX.a[it.n]) || seen[it.n]) return false; seen[it.n] = 1; return true; });
+    if (!L.length) return '';
+    return '<div class="cr-blk"><span class="cr-mut xs">Armas e armaduras que você leva</span><div class="cr-gear">' + L.map(function (it) {
+      const a = itemArt(it.n);
+      return '<figure class="cr-gi">' + (a ? '<img src="' + esc(ARTE + a.p) + '" alt="' + esc(it.n) + '" loading="lazy" decoding="async">' : '<span class="cr-gi0" aria-hidden="true"></span>') + '<figcaption><b>' + esc(it.n) + (it.q > 1 ? ' ×' + it.q : '') + '</b><span>' + esc(itemStat(it.n)) + '</span>' + (a ? '<small>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a></small>' : '') + '</figcaption></figure>';
+    }).join('') + '</div></div>';
+  }
   function artCard(attr, a, inner) {
     return '<button type="button" class="cr-card' + (a ? ' cr-has' : '') + '" ' + attr + '>' + artThumb(a) + '<span class="cr-ctx">' + inner + (a ? '<small class="cr-by">arte: ' + esc(a.by) + '</small>' : '') + '</span></button>';
   }
@@ -643,9 +664,10 @@
     c.eq.forEach(function (line, li) {
       const ai = S.eq.pick[li] || 0;
       if (line.length === 1) { h += '<div class="cr-blk"><span class="cr-mut xs">Sempre</span><p>' + esc(line[0].map(tokTxt).join(', ')) + '</p>' + packTxt(line[0]).replace(/<span>/g, '<span class="cr-mut sm">') + pickers(line[0], 'c' + li + 'a0') + '</div>'; return; }
-      h += '<div class="cr-blk"><div class="cr-opts sm">' + line.map(function (alt, i) { return '<button type="button" class="cr-opt" data-ca="eqp" data-l="' + li + '" data-v="' + i + '" aria-pressed="' + (ai === i) + '"><b>' + esc(alt.map(tokTxt).join(' + ')) + '</b>' + packTxt(alt) + '</button>'; }).join('') + '</div>' + pickers(line[ai], 'c' + li + 'a' + ai) + '</div>';
+      h += '<div class="cr-blk"><div class="cr-opts sm">' + line.map(function (alt, i) { return '<button type="button" class="cr-opt" data-ca="eqp" data-l="' + li + '" data-v="' + i + '" aria-pressed="' + (ai === i) + '">' + optThumbs(alt) + '<b>' + esc(alt.map(tokTxt).join(' + ')) + '</b>' + packTxt(alt) + '</button>'; }).join('') + '</div>' + pickers(line[ai], 'c' + li + 'a' + ai) + '</div>';
     });
     if (b) h += '<div class="cr-blk"><span class="cr-mut xs">Do antecedente (' + esc(b.n) + ')</span><p>' + esc(b.eq.map(tokTxt).join(', ')) + ' e ' + b.po + ' po.</p></div>';
+    h += gearGallery();
     const ac = acInfo();
     h += '<p class="cr-tags"><span>CA ' + ac.v + (ac.t ? ' (' + esc(ac.t) + ')' : '') + '</span><span>' + eqItems().length + ' itens</span></p></section>';
     return h;
@@ -974,6 +996,10 @@
     '.cr-hasart{grid-template-columns:minmax(0,230px) minmax(0,1fr);align-items:start}.cr-artbody{display:grid;gap:12px;min-width:0}' +
     '.cr-art{margin:0;display:grid;gap:4px;min-width:0}.cr-art img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:50% 15%;border-radius:10px;border:1px solid var(--line);display:block;background:var(--surface-2)}' +
     '.cr-art figcaption{font-size:11px;color:var(--muted);line-height:1.3}.cr-art figcaption a{color:inherit}' +
+    '.cr-oth{display:flex;gap:4px;margin-bottom:2px}.cr-oth img{width:44px;height:44px;object-fit:contain;background:#ece8e1;border-radius:8px;border:1px solid var(--line)}' +
+    '.cr-gear{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.cr-gi{margin:0;background:var(--bg);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:grid;align-content:start;min-width:0}' +
+    '.cr-gi img,.cr-gi0{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#ece8e1}.cr-gi0{background:var(--surface-2)}' +
+    '.cr-gi figcaption{display:grid;gap:3px;padding:8px 10px 10px;min-width:0}.cr-gi b{font-size:14px;color:var(--fg)}.cr-gi span{font-size:12.5px;color:var(--muted);line-height:1.35}.cr-gi small{font-size:11px;color:var(--muted);opacity:.8}.cr-gi small a{color:inherit}' +
     '@media(max-width:620px){.cr-hasart{grid-template-columns:minmax(0,1fr)}.cr-art img{aspect-ratio:auto;max-height:300px}}' +
     '.cr-warn{border-color:rgba(255,184,107,.5)}.cr-warn ul{margin:0;padding-left:18px;display:grid;gap:4px;font-size:15px}.cr-link{background:none;border:0;color:var(--accent);font:inherit;padding:0;cursor:pointer;text-decoration:underline}';
   function open(o) {
