@@ -18,7 +18,7 @@
   const STEPS = [['cls', 'Classe'], ['race', 'Raça'], ['at', 'Atributos'], ['bg', 'Antecedente'], ['sk', 'Perícias'], ['feat', 'Habilidades'], ['eq', 'Equipamento'], ['sp', 'Magias'], ['fim', 'Revisão']];
 
   let D = null, IX = null, S = null, OPT = null, root = null, prevOverflow = '';
-  /* artes: fan art do ArtStation guardadas no Supabase (bucket público "arte"); créditos em creditos.json */
+  /* artes: arte oficial da Wizards e fan art (ArtStation etc.) guardadas no Supabase (bucket público "arte"); créditos em creditos.json */
   const ARTE = 'https://ksucnjrmcagzepxahync.supabase.co/storage/v1/object/public/arte/';
   let ART = null, artBusy = false;
   const SUBART = { 'elfo:drow': 'drow', 'anao:duergar': 'duergar', 'elfo:eladrin': 'eladrin', 'elfo:mar': 'elfomar', 'elfo:shadarkai': 'shadarkai', 'gnomo:profundezas': 'gnomoprof', 'gith:githzerai': 'githzerai', 'genasi:ar': 'genasi-ar', 'genasi:terra': 'genasi-terra', 'genasi:fogo': 'genasi-fogo', 'genasi:agua': 'genasi-agua' };
@@ -761,6 +761,8 @@
   function steps2Issues() { const out = []; stepsVisible().forEach(function (s, i) { if (s[0] === 'fim') return; stepIssues(s[0]).forEach(function (t) { out.push([i, s[1], t]); }); }); return out; }
 
   /* ---------- montar ---------- */
+  /* aviso exigido pela Fan Content Policy da Wizards (usamos arte oficial, sem fins comerciais) */
+  const FAN = '<p class="cr-fan">Hollow Table is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>';
   function paint(keepScroll) {
     if (!root) return;
     const st = stepsVisible();
@@ -768,7 +770,7 @@
     const body = root.querySelector('.cr-body'), y = body ? body.scrollTop : 0;
     S.seen = S.seen || {}; S.seen[st[S.step][0]] = 1;
     root.querySelector('.cr-steps').innerHTML = st.map(function (s, i) { const done = s[0] !== 'fim' && (S.seen || {})[s[0]] && !stepIssues(s[0]).length; return '<button type="button" data-ca="go" data-v="' + i + '" aria-current="' + (i === S.step ? 'step' : 'false') + '" class="' + (done ? 'ok' : '') + '"><span>' + (done && i !== S.step ? '✓' : i + 1) + '</span>' + s[1] + '</button>'; }).join('');
-    body.innerHTML = hStep();
+    body.innerHTML = hStep() + FAN;
     const iss = st[S.step][0] === 'fim' ? [] : stepIssues(st[S.step][0]);
     root.querySelector('.cr-foot').innerHTML = '<button type="button" class="cr-btn q" data-ca="prev"' + (S.step === 0 ? ' disabled' : '') + '>Voltar</button><span class="cr-mut sm cr-iss">' + esc(iss[0] || '') + '</span>' + (S.step < st.length - 1 ? '<button type="button" class="cr-btn" data-ca="next">Próximo</button>' : '');
     if (keepScroll) body.scrollTop = y; else body.scrollTop = 0;
@@ -951,6 +953,7 @@
     '.cr-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}' +
     '.cr-body>*{max-width:888px;margin-left:auto;margin-right:auto}' +
     '.cr-foot{display:flex;align-items:center;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--line);background:var(--surface);max-width:none}' +
+    '.cr-fan{margin:28px 0 4px;font-size:11px;line-height:1.4;color:var(--muted,#8a8a99);opacity:.8}' +
     '.cr-foot .cr-iss{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     '.cr-sec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;margin-bottom:12px;min-width:0}' +
     '.cr-sec h3{font-family:var(--serif);font-size:17px;margin:0;letter-spacing:.03em}.cr-pick{border-color:rgba(167,139,250,.55);box-shadow:0 0 22px rgba(167,139,250,.12)}' +
