@@ -42,7 +42,7 @@
   function artThumb(a) { return a ? '<span class="cr-cimg"><img src="' + esc(ARTE + a.p) + '" alt="" loading="lazy" decoding="async"></span>' : ''; }
   function artFig(a, alt) {
     if (!a) return '';
-    return '<figure class="cr-art"><img src="' + esc(ARTE + a.p) + '" alt="' + esc(alt) + '" decoding="async"><figcaption>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a> · ArtStation</figcaption></figure>';
+    return '<figure class="cr-art"><img src="' + esc(ARTE + a.p) + '" alt="' + esc(alt) + '" decoding="async"><figcaption>Arte: <a href="' + esc(a.link) + '" target="_blank" rel="noopener noreferrer">' + esc(a.by) + '</a>' + (a.src == null ? ' · ArtStation' : a.src && a.src !== a.by ? ' · ' + esc(a.src) : '') + '</figcaption></figure>';
   }
   const gimg = function () { return ART ? ' cr-gimg' : ''; };
   /* armas e armaduras: concept arts, chave "it-" + nome sem acentos */
