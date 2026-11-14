@@ -110,7 +110,7 @@ button { cursor: pointer; }
 (function () {
   'use strict';
   const SBC = { url: 'https://ksucnjrmcagzepxahync.supabase.co', key: 'sb_publishable_zg_rPvJ15I_wbaFZ2qemeg_Xnsalgsh' };
-  const VER = '1';
+  const VER = '2';
   const $ = function (s) { return document.querySelector(s); };
   const lsGet = function (k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
   const lsSet = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ } };
@@ -168,7 +168,8 @@ button { cursor: pointer; }
       lim.threshold.value = -6; lim.knee.value = 4; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
       master.connect(lim); lim.connect(ctx.destination);
       fxBus = ctx.createGain(); fxBus.connect(master);
-      ambBus = ctx.createGain(); ambBus.gain.value = ST.talk ? DUCK : 1; ambBus.connect(master);
+      ambBus = ctx.createGain(); ambBus.connect(master);
+      ctx.onstatechange = function () { hello(); };
     }
     if (ctx.state !== 'running') ctx.resume().catch(function () { /* precisa de um toque */ });
   }
@@ -187,51 +188,107 @@ button { cursor: pointer; }
     if (!bufs[path]) bufs[path] = media(path).then(function (r) { return r.arrayBuffer(); }).then(function (ab) { ensure(); return new Promise(function (res, rej) { ctx.decodeAudioData(ab, res, rej); }); }).catch(function (e) { delete bufs[path]; throw e; });
     return bufs[path];
   }
+  /* o que deu certo e errado com o som, para o app do Mestre mostrar (daqui não dá para ver a TV) */
+  const DG = { fx: 0, fxErr: 0, fxEl: 0, amb: 0, ambErr: 0, err: '' };
+  function fail(kind, e) { DG[kind]++; DG.err = (kind === 'fxErr' ? 'efeito: ' : 'ambiente: ') + String(e && e.message ? e.message : e).slice(0, 90); hello(); }
   function blobUrl(path) {
     if (!urls[path]) urls[path] = media(path).then(function (r) { return r.blob(); }).then(function (b) { return URL.createObjectURL(b); }).catch(function (e) { delete urls[path]; throw e; });
     return urls[path];
   }
+  /* endereço temporário para a TV tocar o arquivo aos poucos (ambientes têm vários MB: baixar inteiro antes travava tudo) */
+  const signed = {};
+  async function streamUrl(path) {
+    const c = signed[path];
+    if (c && c.exp > Date.now() + 60000) return c.url;
+    const tok = await token();
+    const r = await fetch(SBC.url + '/storage/v1/object/sign/media/' + path, { method: 'POST', headers: { apikey: SBC.key, Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 21600 }) });
+    if (!r.ok) throw new Error('endereço ' + r.status);
+    const j = await r.json(), u = j.signedURL || j.signedUrl;
+    if (!u) throw new Error('endereço vazio');
+    signed[path] = { url: SBC.url + '/storage/v1' + u, exp: Date.now() + 21600000 };
+    return signed[path].url;
+  }
+  /* efeito pelo elemento <audio>: plano B quando o Web Audio não decodifica ou não está rodando */
+  async function fxElement(path) {
+    const el = new Audio(await blobUrl(path));
+    el.volume = Math.max(0, Math.min(1, ST.vol));
+    await el.play();
+    DG.fx++; DG.fxEl++;
+  }
   async function playFx(path) {
-    if (!ctx || !path) return;
+    if (!path) return;
     const t0 = Date.now();
     try {
+      if (!audioOn()) { ensure(); await fxElement(path); hello(); return; }
       const b = await buffer(path);
-      if (Date.now() - t0 > 4000) return; /* chegou tarde demais: melhor não tocar fora de hora */
+      if (Date.now() - t0 > 9000) return; /* chegou tarde demais: melhor não tocar fora de hora */
       ensure();
       const s = ctx.createBufferSource(), g = ctx.createGain();
       s.buffer = b; g.gain.value = normGain(b); s.connect(g); g.connect(fxBus); s.start();
-    } catch (e) { say('Não consegui tocar um efeito.'); }
+      DG.fx++; hello();
+    } catch (e) {
+      try { await fxElement(path); hello(); } catch (e2) { fail('fxErr', e2 || e); say('Não consegui tocar um efeito.'); }
+    }
   }
+  /* ambientes: um <audio> em laço para cada um, tocando direto da nuvem; o volume é o do ambiente x geral x "falando" */
+  function ambVol(a) { return Math.max(0, Math.min(1, a.level * 0.6 * ST.vol * (ST.talk ? DUCK : 1))); }
+  function fade(a, to, sec, done) {
+    clearInterval(a.ft);
+    const el = a.el, from = el.volume, n = Math.max(1, Math.round(sec * 20)); let k = 0;
+    a.ft = setInterval(function () { k++; try { el.volume = Math.max(0, Math.min(1, from + (to - from) * k / n)); } catch (e) { /* ok */ } if (k >= n) { clearInterval(a.ft); if (done) done(); } }, 50);
+  }
+  function ambRefresh() { Object.keys(ambs).forEach(function (id) { const a = ambs[id]; if (a.el && a.live) fade(a, ambVol(a), 0.25); }); }
   async function ambOn(id, path, level) {
-    if (!ctx || !id || !path) return;
+    if (!id || !path) return;
     if (ambs[id]) { if (ambs[id].path === path) { ambLevel(id, level); return; } ambOff(id); }
-    const a = ambs[id] = { path: path, level: level, out: null, el: null, node: null, dead: false };
+    const a = ambs[id] = { path: path, level: level, el: null, live: false, dead: false, ft: null };
     try {
-      const u = await blobUrl(path);
+      const u = await streamUrl(path);
       if (a.dead || ambs[id] !== a) return;
-      ensure();
-      const el = new Audio(u); el.loop = true; el.preload = 'auto';
-      const node = ctx.createMediaElementSource(el), ng = ctx.createGain(), out = ctx.createGain();
-      ng.gain.value = 0.6; out.gain.value = 0.0001;
-      node.connect(ng); ng.connect(out); out.connect(ambBus);
-      a.el = el; a.node = node; a.out = out;
+      const el = new Audio(); el.loop = true; el.preload = 'auto'; el.volume = 0; el.src = u;
+      a.el = el;
+      el.addEventListener('error', function () { if (ambs[id] === a) { delete ambs[id]; fail('ambErr', 'arquivo não abriu (' + (el.error ? el.error.code : '?') + ')'); say('Não consegui tocar um ambiente.'); } });
       await el.play();
-      ramp(out.gain, a.level, FADE);
-    } catch (e) { if (ambs[id] === a) delete ambs[id]; say('Não consegui tocar um ambiente.'); }
+      if (a.dead) { el.pause(); return; }
+      a.live = true; DG.amb++;
+      fade(a, ambVol(a), FADE); hello();
+    } catch (e) { if (ambs[id] === a) delete ambs[id]; fail('ambErr', e); say('Não consegui tocar um ambiente.'); }
   }
-  function ambLevel(id, level) { const a = ambs[id]; if (!a) return; a.level = level; if (a.out) ramp(a.out.gain, level, 0.08); }
+  function ambLevel(id, level) { const a = ambs[id]; if (!a) return; a.level = level; if (a.el && a.live) fade(a, ambVol(a), 0.1); }
   function ambOff(id) {
     const a = ambs[id]; if (!a) return;
     delete ambs[id]; a.dead = true;
-    if (!a.out) return;
-    ramp(a.out.gain, 0, FADE / 4);
-    setTimeout(function () { try { a.el.pause(); a.node.disconnect(); a.out.disconnect(); a.el.removeAttribute('src'); a.el.load(); } catch (e) { /* já solto */ } }, FADE * 1000 / 4 + 250);
+    if (!a.el) return;
+    fade(a, 0, FADE / 4, function () { try { a.el.pause(); a.el.removeAttribute('src'); a.el.load(); } catch (e) { /* já solto */ } });
   }
   function stopAll() {
     Object.keys(ambs).forEach(ambOff);
     if (ctx) { try { fxBus.disconnect(); } catch (e) { /* ok */ } fxBus = ctx.createGain(); fxBus.connect(master); }
   }
-  function preload(list) { (list || []).slice(0, 60).forEach(function (c) { if (!c || !c.path) return; (c.amb ? blobUrl(c.path) : buffer(c.path)).catch(function () { /* tenta de novo quando tocar */ }); }); }
+  /* só os efeitos (arquivos pequenos) são baixados antes, dois por vez; ambientes tocam por streaming na hora */
+  let preQ = [], preBusy = 0;
+  function preNext() { while (preBusy < 2 && preQ.length) { const p = preQ.shift(); if (bufs[p]) continue; preBusy++; buffer(p).catch(function () { /* tenta de novo quando tocar */ }).then(function () { preBusy--; preNext(); }); } }
+  function preload(list) { (list || []).slice(0, 80).forEach(function (c) { if (c && c.path && !c.amb && preQ.indexOf(c.path) < 0) preQ.push(c.path); }); preNext(); }
+  /* teste pedido pelo app: um toque gerado na hora, pelo Web Audio ('wa') ou por um <audio> ('el') */
+  function testWav() {
+    const sr = 22050, n = Math.round(sr * 0.9), b = new Uint8Array(44 + n * 2), v = new DataView(b.buffer);
+    const w = function (o, t) { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) { const t = i / sr, env = Math.min(1, t * 40) * Math.exp(-t * 4); v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * (t < 0.3 ? 660 : 880) * t) * env * 14000), true); }
+    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
+  }
+  async function soundTest(how) {
+    try {
+      if (how === 'el') { const el = new Audio(testWav()); el.volume = 1; await el.play(); }
+      else {
+        ensure();
+        if (ctx.state !== 'running') throw new Error('Web Audio parado (' + ctx.state + ')');
+        [660, 880].forEach(function (hz, k) { const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + k * 0.3; o.frequency.value = hz; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.35, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(g); g.connect(fxBus); o.start(t); o.stop(t + 0.65); });
+      }
+      say(how === 'el' ? 'Teste de som (ambientes) tocando…' : 'Teste de som (efeitos) tocando…');
+      send({ t: 'tested', how: how, ok: true });
+    } catch (e) { send({ t: 'tested', how: how, ok: false, err: String(e && e.message ? e.message : e).slice(0, 90) }); say('O teste de som falhou.'); }
+  }
 
   /* ---------- camadas: descanso, imagem e mapa ---------- */
   let imgFor = '', imgUrl = {};
@@ -301,7 +358,7 @@ button { cursor: pointer; }
   /* ---------- canal com o app do Mestre ---------- */
   let ch = null, lastGm = 0, started = false, sayT = null;
   function send(o) { return ch ? ch.send(o) : false; }
-  function hello(extra) { send(Object.assign({ t: 'tv', id: TVID, ver: VER, audio: audioOn(), sp: SPT.state, spDev: SPT.dev, map: ST.mapOn, need: !lastGm }, extra || {})); }
+  function hello(extra) { send(Object.assign({ t: 'tv', id: TVID, ver: VER, audio: audioOn(), sp: SPT.state, spDev: SPT.dev, map: ST.mapOn, need: !lastGm, dg: { ctx: ctx ? ctx.state : 'sem', fx: DG.fx, fxEl: DG.fxEl, fxErr: DG.fxErr, amb: DG.amb, ambOn: Object.keys(ambs).filter(function (k) { return ambs[k].live; }).length, ambErr: DG.ambErr, err: DG.err } }, extra || {})); }
   function status() {
     const el = $('#status'), ok = ch && ch.on && Date.now() - lastGm < 60000;
     el.hidden = !started;
@@ -312,8 +369,8 @@ button { cursor: pointer; }
   let quietAt = Date.now();
   function say(t) { const el = $('#status'); $('#status-t').textContent = t; el.classList.remove('quiet', 'ok'); quietAt = Date.now(); clearTimeout(sayT); sayT = setTimeout(status, 5000); }
   function applySync(m) {
-    if (typeof m.vol === 'number') { ST.vol = m.vol; if (master) ramp(master.gain, m.vol, 0.1); }
-    if (typeof m.talk === 'boolean') { ST.talk = m.talk; if (ambBus) ramp(ambBus.gain, m.talk ? DUCK : 1, 0.3); }
+    if (typeof m.vol === 'number') { ST.vol = m.vol; if (master) ramp(master.gain, m.vol, 0.1); ambRefresh(); }
+    if (typeof m.talk === 'boolean') { ST.talk = m.talk; ambRefresh(); }
     if (m.view) ST.view = m.view;
     if (typeof m.name === 'string') ST.name = m.name;
     if (typeof m.adv === 'string') { ST.adv = m.adv; mapFrame(); }
@@ -343,6 +400,7 @@ button { cursor: pointer; }
     else if (m.t === 'view') { ST.view = m.v || 'auto'; layers(); }
     else if (m.t === 'sptok') spToken(m);
     else if (m.t === 'who') hello();
+    else if (m.t === 'test') soundTest(m.how === 'el' ? 'el' : 'wa');
     else if (m.t === 'bye') { lastGm = 0; stopAll(); status(); }
   }
   function connect() {

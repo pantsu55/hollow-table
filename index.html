@@ -840,6 +840,7 @@ input[type="search"] { -webkit-appearance: none; appearance: none; width: 100%; 
 .tv-url { font-family: var(--font-mono); font-size: 14px; font-weight: 500; color: var(--accent); overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
 .tv-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
 .tv-row > div:first-child { display: grid; gap: 2px; flex: 1 1 220px; min-width: 0; }
+.tv-dg { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
 .dock-r { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tgl[aria-pressed="true"] { background: var(--active); border-color: var(--active); color: var(--active-ink); box-shadow: 0 0 22px -6px var(--glow); }
 .vol { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); flex: 1 1 0; min-width: 130px; max-width: 340px; }
@@ -1173,7 +1174,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.74';
+  const APP_VER = '0.75';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -3294,7 +3295,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     tvSend({
       t: 'sync', vol: posToGain(S.vol, 1.5), talk: !!talking, view: TVC.view, adv: A.id, name: A.name, show: tvShow(),
       ambs: Object.keys(active).filter(function (id) { return active[id].remote; }).map(function (id) { const c = findCue(id); return c && tvCueOk(c) ? { id: id, path: c.path, level: tvGain(c) } : null; }).filter(Boolean),
-      pre: S.cues.filter(tvCueOk).map(function (c) { return { path: c.path, amb: c.kind === 'amb' }; }),
+      pre: S.cues.filter(function (c) { return tvCueOk(c) && c.kind !== 'amb'; }).map(function (c) { return { path: c.path }; }),
       sp: tvSpMsg()
     });
   }
@@ -3316,6 +3317,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   function tvMsg(m) {
     if (!m) return;
     if (m.t === 'need' && m.what === 'sptok') { spAccess().then(tvSpTok); return; }
+    if (m.t === 'tested') { TVC.test = { how: m.how, ok: !!m.ok, err: m.err || '', at: Date.now() }; renderTvDlg(); return; }
     if (m.t !== 'tv') return;
     if (m.bye) { TVC.info = null; TVC.seen = 0; tvLost(); tvPaint(); return; }
     const was = tvUp(), wasSound = tvSound(), id0 = TVC.info && TVC.info.id;
@@ -3370,6 +3372,10 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
         '<div class="tv-row"><div><b>Som na TV</b><span class="hint-s">Efeitos e ambientes da nuvem tocam na TV em vez deste aparelho.</span></div><button type="button" class="btn tgl" data-action="tvSound" aria-pressed="' + !!TVC.sound + '">' + (TVC.sound ? 'Ligado' : 'Desligado') + '</button></div>' +
         '<div class="tv-row"><div><b>O que aparece</b><span class="hint-s">' + (TVC.view === 'idle' ? 'Só a tela de descanso.' : TVC.view === 'nomap' ? 'Imagens reveladas; o mapa fica escondido.' : 'A imagem revelada; sem imagem, o mapa' + (i.map ? ' (no ar agora).' : ', quando você mostrar um.')) + '</span></div>' +
         '<div class="seg" role="radiogroup" aria-label="O que aparece na TV">' + [['auto', 'Tudo'], ['nomap', 'Sem mapa'], ['idle', 'Descanso']].map(function (o) { return '<button type="button" role="radio" aria-checked="' + (TVC.view === o[0]) + '" data-action="tvView" data-id="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+      const dg = i.dg || null, tt = TVC.test;
+      const dgTxt = dg ? 'Efeitos tocados: ' + dg.fx + (dg.fxEl ? ' (' + dg.fxEl + ' pelo modo reserva)' : '') + (dg.fxErr ? ', ' + dg.fxErr + ' com falha' : '') + ' · Ambientes no ar: ' + dg.ambOn + (dg.ambErr ? ', ' + dg.ambErr + ' com falha' : '') + (dg.err ? ' · Último erro: ' + dg.err : '') : 'Esta TV está com a página antiga. Recarregue a página na TV.';
+      const ttTxt = !tt ? 'Toque num teste e escute a TV: devem soar duas notas curtas.' : (tt.wait ? 'Tocando o teste na TV…' : (tt.ok ? 'A TV disse que tocou o teste de ' + (tt.how === 'el' ? 'ambientes' : 'efeitos') + '. Se você não ouviu nada, me avise: o som está sendo bloqueado pela TV.' : 'O teste de ' + (tt.how === 'el' ? 'ambientes' : 'efeitos') + ' falhou na TV: ' + esc(tt.err || 'sem detalhe') + '.'));
+      h += '<div class="tv-row"><div><b>Teste de som</b><span class="hint-s" role="status">' + ttTxt + '</span><span class="hint-s tv-dg">' + esc(dgTxt) + '</span></div><div class="row"><button type="button" class="btn sm" data-action="tvTest" data-id="wa">Testar efeitos</button><button type="button" class="btn sm" data-action="tvTest" data-id="el">Testar ambientes</button></div></div>';
       if (SP.enabled && spTok) {
         const st = i.sp || 'off';
         h += '<div class="tv-row"><div><b>Spotify na TV</b><span class="hint-s">' + (spScope ? SPT[st] || '' : 'Para a música tocar dentro da página da TV, o Spotify precisa de uma permissão a mais.') + '</span></div>' +
@@ -4153,6 +4159,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     if (a === 'tvSound') { tvSetSound(!TVC.sound); return; }
     if (a === 'tvView') { TVC.view = id || 'auto'; tvSend({ t: 'view', v: TVC.view }); renderTvDlg(); return; }
     if (a === 'tvSpotify') { tvSpotify(); return; }
+    if (a === 'tvTest') { TVC.test = { how: id, wait: true, at: Date.now() }; tvSend({ t: 'test', how: id }); renderTvDlg(); setTimeout(function () { if (TVC.test && TVC.test.wait) { TVC.test = { how: id, ok: false, err: 'a TV não respondeu', at: Date.now() }; renderTvDlg(); } }, 6000); return; }
     if (a === 'tvSpLogin') { spLogin(); return; }
     if (a === 'talk') { setTalking(!talking); return; }
     if (a === 'stop') { stopAll(); render(); return; }
