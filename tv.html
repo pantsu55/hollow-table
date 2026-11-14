@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Hollow Table · Tela da mesa</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Cinzel:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+  Tela da mesa: a página que fica na TV. Não tem nada do Mestre: só descanso, a imagem revelada
+  e o mapa como os jogadores veem. O som (efeitos e ambientes) toca aqui por comando do app do Mestre.
+  Tudo é dimensionado em vmin para ler de longe, com margem para TVs que cortam as bordas.
+*/
+:root {
+  color-scheme: dark;
+  --bg: #04030A; --surface: #131122; --surface-2: #1B1830; --fg: #E9E6F7; --muted: #9D97BB; --line: #2B2745;
+  --accent: #5EE1F5; --accent-ink: #031219; --active: #8B7BFF; --ok: #6EE0A8; --warn: #F2C078;
+  --display: 'Cinzel', 'Trajan Pro', Georgia, serif; --body: 'Atkinson Hyperlegible', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --safe: max(3vmin, 16px);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: clamp(16px, 2.2vmin, 30px)/1.5 var(--body); overflow: hidden; }
+body.idle-cursor { cursor: none; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
+/* telas de entrada (login e ligar) */
+.gate { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: var(--safe) max(var(--safe), env(safe-area-inset-right, 0px)) var(--safe) max(var(--safe), env(safe-area-inset-left, 0px)); background: radial-gradient(90vmin 70vmin at 50% 30%, rgba(139, 123, 255, 0.16), transparent 70%), var(--bg); overflow: auto; }
+.card { width: min(34em, 100%); display: grid; gap: 0.9em; justify-items: center; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 1em; padding: 1.6em 1.4em; }
+.card img { width: 4.2em; height: 4.2em; border-radius: 0.9em; }
+.card h1 { margin: 0; font: 600 1.5em var(--display); letter-spacing: 0.05em; text-wrap: balance; }
+.card p { margin: 0; color: var(--muted); text-wrap: pretty; }
+.card form { width: 100%; display: grid; gap: 0.7em; text-align: left; }
+.card label { display: grid; gap: 0.25em; font-size: 0.85em; color: var(--muted); }
+.card input { width: 100%; min-height: 2.9em; padding: 0 0.8em; border-radius: 0.6em; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.big { min-height: 3.2em; padding: 0 1.6em; border: 0; border-radius: 0.8em; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 1.05em; }
+.big:disabled { opacity: 0.6; }
+.err { color: var(--warn); min-height: 1.5em; }
+.steps { margin: 0; padding-left: 1.2em; text-align: left; color: var(--muted); display: grid; gap: 0.3em; }
+
+/* camadas da tela */
+.layer { position: fixed; inset: 0; opacity: 0; visibility: hidden; transition: opacity 0.7s ease, visibility 0s linear 0.7s; }
+.layer.on { opacity: 1; visibility: visible; transition: opacity 0.7s ease, visibility 0s; }
+@media (prefers-reduced-motion: reduce) { .layer, .layer.on { transition: none; } }
+#idle { display: grid; place-items: center; background: radial-gradient(80vmin 60vmin at 50% 42%, rgba(139, 123, 255, 0.14), transparent 70%), radial-gradient(60vmin 50vmin at 50% 60%, rgba(94, 225, 245, 0.05), transparent 70%), var(--bg); }
+.idle-in { display: grid; justify-items: center; gap: 2.2vmin; text-align: center; padding: var(--safe); animation: drift 90s ease-in-out infinite alternate; }
+.idle-in img { width: 20vmin; height: 20vmin; border-radius: 4.4vmin; box-shadow: 0 0 12vmin -3vmin rgba(139, 123, 255, 0.7); }
+.idle-in h1 { margin: 0; font: 600 6.4vmin/1.15 var(--display); letter-spacing: 0.06em; text-wrap: balance; max-width: 22ch; }
+.idle-in p { margin: 0; font: 500 2.3vmin var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+@keyframes drift { from { transform: translate(-1.5vmin, -1vmin); } to { transform: translate(1.5vmin, 1vmin); } }
+@media (prefers-reduced-motion: reduce) { .idle-in { animation: none; } }
+#img { display: grid; place-items: center; background: var(--bg); }
+#img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+#img figcaption { position: absolute; left: 50%; bottom: var(--safe); transform: translateX(-50%); max-width: min(86vw, 40em); padding: 0.5em 1.1em; border-radius: 0.7em; background: rgba(4, 3, 10, 0.78); border: 1px solid var(--line); font: 600 3vmin/1.3 var(--display); letter-spacing: 0.04em; text-align: center; text-wrap: balance; }
+#map { background: var(--bg); }
+#map iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--bg); }
+
+/* canto: estado da ligação e menu */
+.status { position: fixed; left: var(--safe); bottom: var(--safe); z-index: 10; display: flex; align-items: center; gap: 0.6em; padding: 0.35em 0.8em; border-radius: 99px; background: rgba(19, 17, 34, 0.86); border: 1px solid var(--line); font: 500 max(12px, 1.7vmin) var(--mono); letter-spacing: 0.04em; color: var(--muted); transition: opacity 0.6s; }
+.status i { width: 0.7em; height: 0.7em; border-radius: 50%; background: var(--warn); }
+.status.ok i { background: var(--ok); box-shadow: 0 0 0.8em var(--ok); }
+.status.quiet { opacity: 0; }
+.menu { position: fixed; right: var(--safe); top: var(--safe); z-index: 12; display: flex; gap: 0.5em; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.menu.show, .menu:focus-within { opacity: 1; pointer-events: auto; }
+.menu button { min-height: 2.8em; padding: 0 1em; border-radius: 0.7em; border: 1px solid var(--line); background: rgba(19, 17, 34, 0.92); font-size: max(14px, 1.9vmin); }
+.menu button:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="gate" id="g-login" hidden>
+  <div class="card">
+    <img src="icon.svg" alt="">
+    <h1>Tela da mesa</h1>
+    <p>Entre com a conta do Mestre. Esta tela não mostra suas anotações: só o que você mandar do iPad.</p>
+    <form id="f-login" autocomplete="on">
+      <label>E-mail<input type="email" id="email" name="email" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" required></label>
+      <label>Senha<input type="password" id="pass" name="password" autocomplete="current-password" required></label>
+      <p class="err" id="login-err" role="alert"></p>
+      <button type="submit" class="big" id="login-btn">Entrar</button>
+    </form>
+  </div>
+</div>
+<div class="gate" id="g-start" hidden>
+  <div class="card">
+    <img src="icon.svg" alt="">
+    <h1>Tela da mesa</h1>
+    <p id="start-who"></p>
+    <button type="button" class="big" id="start-btn">Ligar a tela e o som</button>
+    <ol class="steps"><li>Aperte o botão acima (OK no controle).</li><li>No iPad, abra a Mesa e toque em <b>TV</b> no rodapé.</li></ol>
+    <button type="button" id="out-btn" style="background:none;border:0;color:var(--muted);text-decoration:underline;min-height:2.6em">Sair desta conta</button>
+  </div>
+</div>
+
+<div class="layer on" id="idle"><div class="idle-in"><img src="icon.svg" alt=""><h1 id="idle-name">Hollow Table</h1><p id="idle-sub">Tela da mesa</p></div></div>
+<figure class="layer" id="img" style="margin:0"><img id="img-el" alt=""><figcaption id="img-cap" hidden></figcaption></figure>
+<div class="layer" id="map"></div>
+
+<div class="status" id="status" hidden><i></i><span id="status-t">Aguardando o app do Mestre…</span></div>
+<div class="menu" id="menu"><button type="button" id="m-full">Tela cheia</button><button type="button" id="m-out">Sair da conta</button></div>
+
+<script src="canal.js?v=1"></script>
+<script>
+(function () {
+  'use strict';
+  const SBC = { url: 'https://ksucnjrmcagzepxahync.supabase.co', key: 'sb_publishable_zg_rPvJ15I_wbaFZ2qemeg_Xnsalgsh' };
+  const VER = '1';
+  const $ = function (s) { return document.querySelector(s); };
+  const lsGet = function (k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
+  const lsSet = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ } };
+  const TVID = Math.random().toString(36).slice(2, 10);
+
+  /* ---------- conta (a mesma sessão do app, guardada neste navegador) ---------- */
+  const sess = function () { return lsGet('cdm-sb'); };
+  function store(j) { const x = { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: j.expires_at || Math.floor(Date.now() / 1000) + j.expires_in, user: { id: j.user.id, email: j.user.email } }; lsSet('cdm-sb', x); return x; }
+  let refreshing = null;
+  async function token() {
+    let x = sess();
+    if (!x) throw new Error('sem sessão');
+    if (x.expires_at - 60 < Date.now() / 1000) {
+      if (!refreshing) refreshing = (async function () {
+        const r = await fetch(SBC.url + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { apikey: SBC.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: x.refresh_token }) });
+        if (!r.ok) { if (r.status === 400 || r.status === 401) { try { localStorage.removeItem('cdm-sb'); } catch (e) { /* ok */ } location.reload(); } throw new Error('sessão expirada'); }
+        return store(await r.json());
+      })().finally(function () { refreshing = null; });
+      x = await refreshing;
+    }
+    return x.access_token;
+  }
+  async function api(path) { const tok = await token(); return fetch(SBC.url + path, { headers: { apikey: SBC.key, Authorization: 'Bearer ' + tok } }); }
+  async function media(path) { const r = await api('/storage/v1/object/authenticated/media/' + path); if (!r.ok) throw new Error('arquivo ' + r.status); return r; }
+
+  $('#f-login').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const btn = $('#login-btn'), err = $('#login-err');
+    btn.disabled = true; btn.textContent = 'Entrando…'; err.textContent = '';
+    try {
+      const r = await fetch(SBC.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: SBC.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('#email').value.trim(), password: $('#pass').value }) });
+      if (!r.ok) throw new Error(r.status === 400 ? 'E-mail ou senha incorretos.' : 'Não consegui entrar agora. Tente de novo.');
+      store(await r.json()); $('#pass').value = '';
+      boot();
+    } catch (x) { err.textContent = x && x.message && !/fetch/i.test(x.message) ? x.message : 'Sem conexão. Confira a internet da TV.'; }
+    btn.disabled = false; btn.textContent = 'Entrar';
+  });
+  function signOut() { try { localStorage.removeItem('cdm-sb'); } catch (e) { /* ok */ } location.reload(); }
+  $('#out-btn').addEventListener('click', signOut);
+  $('#m-out').addEventListener('click', signOut);
+  $('#m-full').addEventListener('click', function () { const d = document.documentElement; try { if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () { /* a TV já é tela cheia */ }); } catch (e) { /* ok */ } });
+
+  /* ---------- som ---------- */
+  let ctx = null, master = null, fxBus = null, ambBus = null;
+  const ST = { vol: 1, talk: false, view: 'auto', adv: '', name: '', show: null, mapOn: false, mapName: '' };
+  const DUCK = 0.22, FADE = 1.6;
+  const bufs = {}, urls = {}, ambs = {};
+  function audioOn() { return !!ctx && ctx.state === 'running'; }
+  function ensure() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      master = ctx.createGain(); master.gain.value = ST.vol;
+      const lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = -6; lim.knee.value = 4; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
+      master.connect(lim); lim.connect(ctx.destination);
+      fxBus = ctx.createGain(); fxBus.connect(master);
+      ambBus = ctx.createGain(); ambBus.gain.value = ST.talk ? DUCK : 1; ambBus.connect(master);
+    }
+    if (ctx.state !== 'running') ctx.resume().catch(function () { /* precisa de um toque */ });
+  }
+  function ramp(p, v, s) { const t = ctx.currentTime; try { p.cancelScheduledValues(t); p.setValueAtTime(Math.max(0.0001, p.value), t); p.linearRampToValueAtTime(Math.max(0.0001, v), t + s); } catch (e) { p.value = v; } }
+  /* nivela o volume dos arquivos (mesma conta do app do Mestre, para soar igual) */
+  function normGain(buf) {
+    if (buf._g) return buf._g;
+    let sum = 0, n = 0, peak = 0;
+    for (let ch = 0; ch < buf.numberOfChannels; ch++) { const d = buf.getChannelData(ch); for (let i = 0; i < d.length; i += 3) { const v = d[i]; sum += v * v; n++; if (Math.abs(v) > peak) peak = Math.abs(v); } }
+    const rms = Math.sqrt(sum / Math.max(1, n)) || 0.0001;
+    let g = Math.min(0.2 / rms, 1.6 / Math.max(peak, 0.0001));
+    g = Math.max(0.5, Math.min(g, 12));
+    buf._g = g; return g;
+  }
+  function buffer(path) {
+    if (!bufs[path]) bufs[path] = media(path).then(function (r) { return r.arrayBuffer(); }).then(function (ab) { ensure(); return new Promise(function (res, rej) { ctx.decodeAudioData(ab, res, rej); }); }).catch(function (e) { delete bufs[path]; throw e; });
+    return bufs[path];
+  }
+  function blobUrl(path) {
+    if (!urls[path]) urls[path] = media(path).then(function (r) { return r.blob(); }).then(function (b) { return URL.createObjectURL(b); }).catch(function (e) { delete urls[path]; throw e; });
+    return urls[path];
+  }
+  async function playFx(path) {
+    if (!ctx || !path) return;
+    const t0 = Date.now();
+    try {
+      const b = await buffer(path);
+      if (Date.now() - t0 > 4000) return; /* chegou tarde demais: melhor não tocar fora de hora */
+      ensure();
+      const s = ctx.createBufferSource(), g = ctx.createGain();
+      s.buffer = b; g.gain.value = normGain(b); s.connect(g); g.connect(fxBus); s.start();
+    } catch (e) { say('Não consegui tocar um efeito.'); }
+  }
+  async function ambOn(id, path, level) {
+    if (!ctx || !id || !path) return;
+    if (ambs[id]) { if (ambs[id].path === path) { ambLevel(id, level); return; } ambOff(id); }
+    const a = ambs[id] = { path: path, level: level, out: null, el: null, node: null, dead: false };
+    try {
+      const u = await blobUrl(path);
+      if (a.dead || ambs[id] !== a) return;
+      ensure();
+      const el = new Audio(u); el.loop = true; el.preload = 'auto';
+      const node = ctx.createMediaElementSource(el), ng = ctx.createGain(), out = ctx.createGain();
+      ng.gain.value = 0.6; out.gain.value = 0.0001;
+      node.connect(ng); ng.connect(out); out.connect(ambBus);
+      a.el = el; a.node = node; a.out = out;
+      await el.play();
+      ramp(out.gain, a.level, FADE);
+    } catch (e) { if (ambs[id] === a) delete ambs[id]; say('Não consegui tocar um ambiente.'); }
+  }
+  function ambLevel(id, level) { const a = ambs[id]; if (!a) return; a.level = level; if (a.out) ramp(a.out.gain, level, 0.08); }
+  function ambOff(id) {
+    const a = ambs[id]; if (!a) return;
+    delete ambs[id]; a.dead = true;
+    if (!a.out) return;
+    ramp(a.out.gain, 0, FADE / 4);
+    setTimeout(function () { try { a.el.pause(); a.node.disconnect(); a.out.disconnect(); a.el.removeAttribute('src'); a.el.load(); } catch (e) { /* já solto */ } }, FADE * 1000 / 4 + 250);
+  }
+  function stopAll() {
+    Object.keys(ambs).forEach(ambOff);
+    if (ctx) { try { fxBus.disconnect(); } catch (e) { /* ok */ } fxBus = ctx.createGain(); fxBus.connect(master); }
+  }
+  function preload(list) { (list || []).slice(0, 60).forEach(function (c) { if (!c || !c.path) return; (c.amb ? blobUrl(c.path) : buffer(c.path)).catch(function () { /* tenta de novo quando tocar */ }); }); }
+
+  /* ---------- camadas: descanso, imagem e mapa ---------- */
+  let imgFor = '', imgUrl = {};
+  function layers() {
+    const want = ST.view === 'idle' ? 'idle' : (ST.show && ST.show.ready ? 'img' : (ST.mapOn && ST.view !== 'nomap' ? 'map' : 'idle'));
+    ['idle', 'img', 'map'].forEach(function (k) { $('#' + k).classList.toggle('on', k === want); });
+    $('#idle-name').textContent = ST.name || 'Hollow Table';
+  }
+  async function showImage(sh) {
+    if (!sh || !sh.path) { ST.show = null; imgFor = ''; layers(); return; }
+    if (imgFor === sh.path) { if (ST.show) { ST.show.caption = sh.caption || ''; cap(); } return; }
+    imgFor = sh.path;
+    ST.show = { path: sh.path, caption: sh.caption || '', ready: false };
+    try {
+      if (!imgUrl[sh.path]) imgUrl[sh.path] = URL.createObjectURL(await (await media(sh.path)).blob());
+      if (imgFor !== sh.path) return;
+      const el = $('#img-el');
+      await new Promise(function (res) { el.onload = el.onerror = res; el.src = imgUrl[sh.path]; });
+      if (imgFor !== sh.path) return;
+      ST.show.ready = true; cap(); layers();
+    } catch (e) { if (imgFor === sh.path) { ST.show = null; imgFor = ''; layers(); say('Não consegui abrir a imagem.'); } }
+  }
+  function cap() { const c = $('#img-cap'), t = ST.show && ST.show.caption; c.hidden = !t; c.textContent = t || ''; }
+  let mapAdv = null;
+  function mapFrame() {
+    const box = $('#map');
+    if (ST.adv === mapAdv) return;
+    mapAdv = ST.adv; ST.mapOn = false;
+    box.innerHTML = ST.adv ? '<iframe title="Mapa da mesa" src="jogar.html?embed=mapa&amp;tv=1&amp;adv=' + encodeURIComponent(ST.adv) + '"></iframe>' : '';
+    layers();
+  }
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || e.data.ht !== 'tvmap') return;
+    ST.mapOn = !!e.data.on; ST.mapName = e.data.name || ''; layers(); hello();
+  });
+
+  /* ---------- Spotify dentro da página (se o navegador da TV deixar) ---------- */
+  const SPT = { state: 'off', dev: '', tok: '', exp: 0, player: null, loading: false };
+  function spSet(s) { if (SPT.state !== s) { SPT.state = s; hello(); } }
+  function spToken(t) {
+    if (!t || !t.tok) return;
+    SPT.tok = t.tok; SPT.exp = t.exp || 0;
+    if (!SPT.player && !SPT.loading && audioOn()) spStart();
+  }
+  function spStart() {
+    if (SPT.player || SPT.loading || !SPT.tok) return;
+    SPT.loading = true; spSet('load');
+    window.onSpotifyWebPlaybackSDKReady = function () {
+      try {
+        const p = new window.Spotify.Player({ name: 'Hollow Table · TV', volume: 0.8, getOAuthToken: function (cb) { if (SPT.exp && SPT.exp < Date.now() + 30000) send({ t: 'need', what: 'sptok' }); cb(SPT.tok); } });
+        p.addListener('ready', function (x) { SPT.dev = x.device_id; spSet('ready'); });
+        p.addListener('not_ready', function () { SPT.dev = ''; spSet('load'); });
+        p.addListener('initialization_error', function () { spSet('unsupported'); });
+        p.addListener('authentication_error', function () { spSet('auth'); });
+        p.addListener('account_error', function () { spSet('premium'); });
+        p.connect().then(function (ok) { if (!ok && SPT.state === 'load') spSet('unsupported'); });
+        SPT.player = p;
+      } catch (e) { spSet('unsupported'); }
+    };
+    const s = document.createElement('script');
+    s.src = 'https://sdk.scdn.co/spotify-player.js';
+    s.onerror = function () { SPT.loading = false; spSet('unsupported'); };
+    document.head.appendChild(s);
+    setTimeout(function () { if (SPT.state === 'load' && !SPT.dev) spSet('unsupported'); }, 25000);
+  }
+
+  /* ---------- canal com o app do Mestre ---------- */
+  let ch = null, lastGm = 0, started = false, sayT = null;
+  function send(o) { return ch ? ch.send(o) : false; }
+  function hello(extra) { send(Object.assign({ t: 'tv', id: TVID, ver: VER, audio: audioOn(), sp: SPT.state, spDev: SPT.dev, map: ST.mapOn, need: !lastGm }, extra || {})); }
+  function status() {
+    const el = $('#status'), ok = ch && ch.on && Date.now() - lastGm < 60000;
+    el.hidden = !started;
+    el.classList.toggle('ok', !!ok);
+    $('#status-t').textContent = ok ? 'Ligada ao app do Mestre' : (ch && ch.on ? 'Aguardando o app do Mestre… abra a Mesa no iPad' : 'Sem ligação. Tentando de novo…');
+    el.classList.toggle('quiet', !!ok && Date.now() - quietAt > 6000);
+  }
+  let quietAt = Date.now();
+  function say(t) { const el = $('#status'); $('#status-t').textContent = t; el.classList.remove('quiet', 'ok'); quietAt = Date.now(); clearTimeout(sayT); sayT = setTimeout(status, 5000); }
+  function applySync(m) {
+    if (typeof m.vol === 'number') { ST.vol = m.vol; if (master) ramp(master.gain, m.vol, 0.1); }
+    if (typeof m.talk === 'boolean') { ST.talk = m.talk; if (ambBus) ramp(ambBus.gain, m.talk ? DUCK : 1, 0.3); }
+    if (m.view) ST.view = m.view;
+    if (typeof m.name === 'string') ST.name = m.name;
+    if (typeof m.adv === 'string') { ST.adv = m.adv; mapFrame(); }
+    if ('show' in m) showImage(m.show);
+    if (Array.isArray(m.ambs)) {
+      const keep = {};
+      m.ambs.forEach(function (a) { keep[a.id] = 1; ambOn(a.id, a.path, a.level); });
+      Object.keys(ambs).forEach(function (id) { if (!keep[id]) ambOff(id); });
+    }
+    if (m.pre) preload(m.pre);
+    if (m.sp) spToken(m.sp);
+    layers();
+  }
+  function onMsg(m) {
+    if (!m || m.t === 'tv') return; /* outra TV na mesma conta */
+    const was = Date.now() - lastGm < 60000;
+    lastGm = Date.now();
+    if (!was) { quietAt = Date.now(); status(); }
+    if (m.t === 'sync') applySync(m);
+    else if (m.t === 'fx') playFx(m.path);
+    else if (m.t === 'amb') { if (m.on) ambOn(m.id, m.path, m.level); else ambOff(m.id); }
+    else if (m.t === 'lvl') ambLevel(m.id, m.level);
+    else if (m.t === 'stop') stopAll();
+    else if (m.t === 'vol') applySync({ vol: m.v });
+    else if (m.t === 'talk') applySync({ talk: !!m.on });
+    else if (m.t === 'show') showImage(m.path ? { path: m.path, caption: m.caption } : null);
+    else if (m.t === 'view') { ST.view = m.v || 'auto'; layers(); }
+    else if (m.t === 'sptok') spToken(m);
+    else if (m.t === 'who') hello();
+    else if (m.t === 'bye') { lastGm = 0; stopAll(); status(); }
+  }
+  function connect() {
+    if (ch) return;
+    ch = window.HTCanal({ url: SBC.url, key: SBC.key, topic: 'tv:' + sess().user.id, token: token, onMsg: onMsg, onState: function (on) { if (on) hello({ need: true }); status(); } });
+    setInterval(function () { hello(); status(); if (lastGm && Date.now() - lastGm > 90000) { lastGm = 0; stopAll(); } }, 15000);
+    window.addEventListener('pagehide', function () { send({ t: 'tv', id: TVID, bye: true }); });
+  }
+
+  /* ---------- telas ---------- */
+  let lock = null;
+  async function wake() { try { if (navigator.wakeLock && !lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', function () { lock = null; }); } } catch (e) { /* a TV não precisa */ } }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && started) { wake(); ensure(); } });
+  function start() {
+    ensure();
+    started = true;
+    $('#g-start').hidden = true;
+    wake(); connect(); status(); layers();
+    if (SPT.tok) spStart();
+    hello({ need: true });
+  }
+  $('#start-btn').addEventListener('click', start);
+  function boot() {
+    const s = sess();
+    $('#g-login').hidden = !!s;
+    $('#g-start').hidden = !s || started;
+    if (!s) { setTimeout(function () { $('#email').focus(); }, 50); return; }
+    $('#start-who').textContent = 'Conta: ' + s.user.email;
+    setTimeout(function () { $('#start-btn').focus(); }, 50);
+  }
+  /* o menu aparece quando alguém mexe no controle ou no mouse e some sozinho */
+  let menuT = null, curT = null;
+  function poke() {
+    if (!started) return;
+    $('#menu').classList.add('show'); document.body.classList.remove('idle-cursor');
+    quietAt = Date.now(); status();
+    clearTimeout(menuT); menuT = setTimeout(function () { $('#menu').classList.remove('show'); }, 5000);
+    clearTimeout(curT); curT = setTimeout(function () { document.body.classList.add('idle-cursor'); }, 5000);
+  }
+  ['mousemove', 'keydown', 'pointerdown'].forEach(function (ev) { document.addEventListener(ev, poke, { passive: true }); });
+  window.HTTV = { state: ST, sp: SPT, ambs: ambs, audioOn: audioOn };
+  boot();
+})();
+</script>
+</body>
+</html>

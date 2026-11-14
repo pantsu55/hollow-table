@@ -828,6 +828,18 @@ input[type="search"] { -webkit-appearance: none; appearance: none; width: 100%; 
 .spm-b.main { background: var(--active); color: var(--active-ink); border-radius: 50%; }
 .spm-b.main svg { width: 20px; height: 20px; }
 @media (max-width: 760px) { .spm { width: 100%; } .spm-slot { flex: 1 1 100%; } }
+.tv-b { gap: 8px; }
+.tv-b i { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.tv-b.on { color: var(--fg); border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
+.tv-b.on i { background: var(--ok); box-shadow: 0 0 9px var(--ok); }
+.tv-card { gap: 14px; }
+.tv-st { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.tv-st i { width: 11px; height: 11px; border-radius: 50%; background: var(--muted); flex: none; }
+.tv-st.on i { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+.tv-steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; line-height: 1.45; }
+.tv-url { font-family: var(--font-mono); font-size: 14px; font-weight: 500; color: var(--accent); overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
+.tv-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--line); }
+.tv-row > div:first-child { display: grid; gap: 2px; flex: 1 1 220px; min-width: 0; }
 .dock-r { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tgl[aria-pressed="true"] { background: var(--active); border-color: var(--active); color: var(--active-ink); box-shadow: 0 0 22px -6px var(--glow); }
 .vol { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); flex: 1 1 0; min-width: 130px; max-width: 340px; }
@@ -1136,10 +1148,12 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
 <div class="gate dlg" id="prodlg" hidden role="dialog" aria-modal="true" aria-label="Perfil"></div>
 <div class="gate dlg" id="libdlg" hidden role="dialog" aria-modal="true" aria-label="Biblioteca"></div>
 <main class="app" id="main"></main>
+<div class="gate dlg" id="tvdlg" hidden role="dialog" aria-modal="true" aria-label="Tela da mesa (TV)"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <footer class="dock" id="dock" hidden></footer>
 
-<script src="mapa.js?v=0.56"></script>
+<script src="mapa.js?v=0.74"></script>
+<script src="canal.js?v=1"></script>
 <script>
 (function () {
   'use strict';
@@ -1159,7 +1173,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.73';
+  const APP_VER = '0.74';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -1926,7 +1940,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   /* a sala por link (sem conta) saiu: fica só a mesa online com contas */
   try { localStorage.removeItem('ht-room'); } catch (e) { /* ok */ }
   const rnd = function (n) { const a = 'abcdefghjkmnpqrstuvwxyz23456789'; let r = ''; for (let k = 0; k < n; k++) r += a[Math.floor(Math.random() * a.length)]; return r; };
-  function unreveal() { revealed = null; campHide(); }
+  function unreveal() { revealed = null; campHide(); if (typeof tvShowPush === 'function') tvShowPush(); }
   /* mesa online: a imagem revelada aparece na tela dos jogadores com conta, que podem guardá-la na Memória */
   let campLive = null;
   const SHOWK = function (cid) { return 'ht-shows-' + cid; };
@@ -2535,7 +2549,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   /* ---------- Spotify (login PKCE + Web API, sem servidor) ---------- */
   const SP = {
     clientId: '69eea9091c12429581bf220133d0b732',
-    scopes: 'user-modify-playback-state user-read-playback-state',
+    scopes: 'user-modify-playback-state user-read-playback-state streaming user-read-email user-read-private',
     enabled: /\.github\.io$/.test(location.hostname)
   };
   let spPlaying = false, spFailed = false, spResume = '', spCurDev = null, spVol = 70;
@@ -2568,7 +2582,8 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     });
     if (!r.ok) throw new Error('token');
     const j = await r.json(), old = spStore.get() || {};
-    spStore.set({ access: j.access_token, refresh: j.refresh_token || old.refresh, exp: Date.now() + (j.expires_in - 60) * 1000 });
+    spStore.set({ access: j.access_token, refresh: j.refresh_token || old.refresh, exp: Date.now() + (j.expires_in - 60) * 1000, scope: j.scope || old.scope || '' });
+    if (typeof tvSpTok === 'function') tvSpTok();
   }
   async function spHandleCallback() {
     const p = new URLSearchParams(location.search);
@@ -3144,6 +3159,11 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   const findCue = function (id) { return S.cues.filter(function (c) { return c.id === id; })[0]; };
 
   function playFx(c) {
+    if (tvSound() && tvCueOk(c)) {
+      tvSend({ t: 'fx', id: c.id, path: c.path });
+      $$('[data-action="fx"][data-id="' + c.id + '"]').forEach(function (btn) { btn.classList.add('playing'); setTimeout(function () { btn.classList.remove('playing'); }, Math.min(dur(c), 4) * 1000); });
+      return;
+    }
     ensure();
     const t = ctx.currentTime + 0.03;
     if (c.src === 'file' && !fileBuffers[c.id]) { toast('Este som ainda está baixando da nuvem.'); return; }
@@ -3188,6 +3208,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     const a = active[id];
     if (!a) return;
     delete active[id];
+    if (a.remote) { tvSend({ t: 'amb', id: id, on: false }); return; }
     const f = fadeSec();
     rampTo(a.out.gain, 0, f / 4);
     setTimeout(function () {
@@ -3199,6 +3220,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     const c = findCue(id);
     if (!c) return;
     if (active[id]) { stopAmb(id); return; }
+    if (tvSound() && tvCueOk(c)) { active[id] = { remote: true }; tvSend({ t: 'amb', id: id, on: true, path: c.path, level: tvGain(c) }); return; }
     if (c.src === 'file' && !fileBuffers[c.id] && !ambUrl[c.id]) { toast(ambErr[c.id] ? 'Não consegui baixar este som da nuvem. Vou tentar de novo — confira a internet.' : 'Este som ainda está baixando da nuvem.'); sbHydrate(S); return; }
     ensure();
     active[id] = startAmb(c, posToGain(ambLevel(c), 1.2) * ambK(c));
@@ -3228,16 +3250,133 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   function setTalking(on) {
     talking = on;
     if (ambBus) rampTo(ambBus.gain, on ? DUCK : 1, on ? 0.15 : 0.5);
+    tvSend({ t: 'talk', on: !!on });
     spDuck(on);
     if (mode === 'mesa') renderDock();
   }
   function stopAll() {
     Object.keys(active).forEach(stopAmb);
+    if (tvUp()) tvSend({ t: 'stop' });
     if (ctx) {
       try { fxBus.disconnect(); } catch (e) { /* já solto */ }
       fxBus = ctx.createGain();
       fxBus.connect(master);
     }
+  }
+
+  /* ---------- TV: a tela da mesa ----------
+     A TV abre tv.html com a mesma conta. Os dois aparelhos conversam por um canal privado (canal.js):
+     o app manda o que tocar e o que mostrar; a TV avisa a cada 15 s que está ligada. Só arquivos da nuvem
+     tocam na TV; os sons sintetizados da aventura de exemplo continuam saindo deste aparelho. */
+  var TVC = { ch: null, seen: 0, info: null, sound: lsGet('ht-tv-som', true) !== false, view: 'auto', sig: '', volT: 0, lost: false };
+  var tvDlg = false;
+  function tvUp() { return !!(TVC && TVC.ch && TVC.ch.on && TVC.info && Date.now() - TVC.seen < 50000); }
+  function tvSound() { return tvUp() && TVC.sound && !!TVC.info.audio; }
+  function tvSend(o) { return TVC && TVC.ch ? TVC.ch.send(o) : false; }
+  function tvCueOk(c) { return !!(c && c.src === 'file' && c.path); }
+  function tvGain(c) { return posToGain(ambLevel(c), 1.2) * ambK(c); }
+  function tvShow() {
+    if (!revealed || audience.indexOf('todos') < 0) return null;
+    const im = S.images.filter(function (i) { return i.id === revealed; })[0];
+    return im && im.path ? { path: im.path, caption: im.caption || '' } : null;
+  }
+  function tvShowPush(warn) {
+    if (!tvUp()) return;
+    const sh = tvShow();
+    tvSend(sh ? { t: 'show', path: sh.path, caption: sh.caption } : { t: 'show', path: null });
+    if (warn && revealed && !sh) toast(audience.indexOf('todos') < 0 ? 'Imagem só para alguns jogadores: ela não vai para a TV.' : 'Esta imagem ainda não subiu para a nuvem, então não aparece na TV.');
+  }
+  function tvSpMsg() { const t = spStore.get(); return t && t.access && /\bstreaming\b/.test(t.scope || '') && Date.now() < t.exp ? { tok: t.access, exp: t.exp } : null; }
+  function tvSpTok() { if (!tvUp()) return; const m = tvSpMsg(); if (m) tvSend({ t: 'sptok', tok: m.tok, exp: m.exp }); }
+  function tvSig() { return A.id + '|' + A.cur + '|' + S.cues.map(function (c) { return c.path || ''; }).join(','); }
+  function tvSync() {
+    TVC.sig = tvSig();
+    tvSend({
+      t: 'sync', vol: posToGain(S.vol, 1.5), talk: !!talking, view: TVC.view, adv: A.id, name: A.name, show: tvShow(),
+      ambs: Object.keys(active).filter(function (id) { return active[id].remote; }).map(function (id) { const c = findCue(id); return c && tvCueOk(c) ? { id: id, path: c.path, level: tvGain(c) } : null; }).filter(Boolean),
+      pre: S.cues.filter(tvCueOk).map(function (c) { return { path: c.path, amb: c.kind === 'amb' }; }),
+      sp: tvSpMsg()
+    });
+  }
+  /* quando o som passa para a TV (ou volta), os ambientes que estavam tocando mudam de aparelho sem parar a cena */
+  function tvTake() {
+    Object.keys(active).forEach(function (id) { const c = findCue(id); if (!active[id].remote && tvCueOk(c)) { stopAmb(id); active[id] = { remote: true }; tvSend({ t: 'amb', id: id, on: true, path: c.path, level: tvGain(c) }); } });
+  }
+  function tvGive(tell) {
+    const ids = Object.keys(active).filter(function (id) { return active[id].remote; });
+    ids.forEach(function (id) { delete active[id]; if (tell) tvSend({ t: 'amb', id: id, on: false }); });
+    ids.forEach(function (id) { toggleAmb(id); });
+    return ids.length;
+  }
+  function tvSetSound(on) {
+    TVC.sound = !!on; lsSet('ht-tv-som', TVC.sound);
+    if (TVC.sound) { if (tvSound()) tvTake(); } else tvGive(true);
+    renderTvDlg(); render();
+  }
+  function tvMsg(m) {
+    if (!m) return;
+    if (m.t === 'need' && m.what === 'sptok') { spAccess().then(tvSpTok); return; }
+    if (m.t !== 'tv') return;
+    if (m.bye) { TVC.info = null; TVC.seen = 0; tvLost(); tvPaint(); return; }
+    const was = tvUp(), wasSound = tvSound(), id0 = TVC.info && TVC.info.id;
+    TVC.info = m; TVC.seen = Date.now(); TVC.lost = false;
+    if (m.need || !was || id0 !== m.id) tvSync();
+    if (!wasSound && tvSound()) tvTake();
+    if (!was) toast('TV ligada' + (tvSound() ? ': os sons agora saem nela.' : '.'));
+    tvPaint();
+  }
+  function tvLost() {
+    if (TVC.lost) return; TVC.lost = true;
+    if (tvGive(false)) toast('A TV desligou. Os ambientes voltaram para este aparelho.');
+  }
+  function tvConnect() {
+    if (TVC.ch || !sbUser() || !window.HTCanal) return;
+    TVC.ch = window.HTCanal({ url: SBC.url, key: SBC.key, topic: 'tv:' + sbUser().id, token: sbToken, onMsg: tvMsg, onState: function (on) { if (on) tvSend({ t: 'who' }); tvPaint(); } });
+    setInterval(function () {
+      if (TVC.info && !tvUp()) { TVC.info = null; tvLost(); tvPaint(); }
+      if (tvUp() && TVC.sig !== tvSig()) tvSync();
+    }, 5000);
+    window.addEventListener('pagehide', function () { if (tvUp()) tvSend({ t: 'bye' }); });
+  }
+  function tvBtn() {
+    if (!sbUser()) return '';
+    const up = tvUp();
+    return '<button type="button" class="btn quiet tv-b' + (up ? ' on' : '') + '" data-action="tvOpen" title="Tela da mesa (TV)" aria-label="Tela da mesa na TV: ' + (up ? (tvSound() ? 'ligada, com o som nela' : 'ligada') : 'desligada') + '"><i aria-hidden="true"></i>TV</button>';
+  }
+  function tvPaint() { const b = document.querySelector('.tv-b'); if (b) b.outerHTML = tvBtn(); if (tvDlg) renderTvDlg(); }
+  async function tvSpotify() {
+    const d = TVC.info && TVC.info.spDev;
+    if (!d) return;
+    spDev.set({ id: d, name: 'Hollow Table · TV' }); spCurDev = d;
+    const r = await spApi('PUT', '/me/player', { device_ids: [d], play: !!spPlaying });
+    toast(spOk(r.status) ? 'A música agora sai pela TV.' : 'A TV foi escolhida como aparelho do Spotify. Toque em tocar para começar.');
+    setTimeout(spNowPoll, 1200); renderTvDlg();
+  }
+  function renderTvDlg() {
+    const el = $('#tvdlg');
+    if (!el) return;
+    if (!tvDlg) { el.hidden = true; return; }
+    el.hidden = false;
+    const up = tvUp(), i = TVC.info || {}, url = location.origin + location.pathname.replace(/index\.html$/, '') + 'tv.html';
+    const spTok = spStore.get(), spScope = !!(spTok && /\bstreaming\b/.test(spTok.scope || ''));
+    const SPT = { ready: 'O Spotify pode tocar dentro da TV.', load: 'Ligando o Spotify na TV…', unsupported: 'O navegador desta TV não consegue tocar o Spotify dentro da página. A música continua no aparelho escolhido em Música.', auth: 'A TV recusou a permissão do Spotify. Conecte o Spotify de novo.', premium: 'O Spotify só toca dentro da página com conta Premium.', off: spScope ? 'Aguardando a TV ligar o Spotify…' : '' };
+    let h = '<div class="gate-card dlg-card tv-card"><h1>Tela da mesa</h1>';
+    if (!up) {
+      h += '<p class="tv-st"><i></i>' + (TVC.ch && TVC.ch.on ? 'Nenhuma TV ligada agora.' : 'Conectando…') + '</p>' +
+        '<ol class="tv-steps"><li>No navegador da TV (ou de um aparelho que projete nela), abra <b class="tv-url">' + esc(url.replace(/^https?:\/\//, '')) + '</b></li><li>Entre com a sua conta de Mestre e aperte <b>Ligar a tela e o som</b>.</li><li>Pronto: esta janela mostra a TV ligada.</li></ol>' +
+        '<p class="hint-s">A TV mostra só a tela de descanso, a imagem revelada para todos e o mapa como os jogadores veem. Suas anotações ficam só aqui.</p>';
+    } else {
+      h += '<p class="tv-st on"><i></i>TV ligada' + (i.audio ? '' : ', mas com o som travado: aperte o botão na TV') + '</p>' +
+        '<div class="tv-row"><div><b>Som na TV</b><span class="hint-s">Efeitos e ambientes da nuvem tocam na TV em vez deste aparelho.</span></div><button type="button" class="btn tgl" data-action="tvSound" aria-pressed="' + !!TVC.sound + '">' + (TVC.sound ? 'Ligado' : 'Desligado') + '</button></div>' +
+        '<div class="tv-row"><div><b>O que aparece</b><span class="hint-s">' + (TVC.view === 'idle' ? 'Só a tela de descanso.' : TVC.view === 'nomap' ? 'Imagens reveladas; o mapa fica escondido.' : 'A imagem revelada; sem imagem, o mapa' + (i.map ? ' (no ar agora).' : ', quando você mostrar um.')) + '</span></div>' +
+        '<div class="seg" role="radiogroup" aria-label="O que aparece na TV">' + [['auto', 'Tudo'], ['nomap', 'Sem mapa'], ['idle', 'Descanso']].map(function (o) { return '<button type="button" role="radio" aria-checked="' + (TVC.view === o[0]) + '" data-action="tvView" data-id="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+      if (SP.enabled && spTok) {
+        const st = i.sp || 'off';
+        h += '<div class="tv-row"><div><b>Spotify na TV</b><span class="hint-s">' + (spScope ? SPT[st] || '' : 'Para a música tocar dentro da página da TV, o Spotify precisa de uma permissão a mais.') + '</span></div>' +
+          (!spScope || st === 'auth' ? '<button type="button" class="btn" data-action="tvSpLogin">Conectar de novo</button>' : (st === 'ready' && i.spDev ? '<button type="button" class="btn' + (spCurDev === i.spDev ? ' tgl" aria-pressed="true' : '') + '" data-action="tvSpotify">' + (spCurDev === i.spDev ? 'Tocando na TV' : 'Tocar na TV') + '</button>' : '')) + '</div>';
+      }
+    }
+    el.innerHTML = h + '<button type="button" class="btn quiet" data-action="tvClose">Fechar</button></div>';
   }
 
   /* ---------- telas ---------- */
@@ -3726,6 +3865,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   }
 
   function renderDock() {
+    tvConnect();
     let pips = '';
     for (let i = 0; i < 12; i++) pips += '<i class="' + (i < S.fear ? 'on' : '') + '"></i>';
     const cd = S.countdown;
@@ -3742,7 +3882,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       '<button type="button" class="rnd" data-action="fear" data-d="1" aria-label="Ganhar um Medo">+</button><span class="fear-pips" aria-hidden="true">' + pips + '</span></div>' : '') + cdh +
       '<div class="spm-slot" id="spm-slot">' + spMiniHtml() + '</div>' +
       '<label class="vol" title="Volume dos sons">' + ICO.vol + '<span class="lbl-s">Volume dos sons</span><input type="range" id="vol-master" min="0" max="1" step="0.005" value="' + S.vol + '" aria-label="Volume dos sons"></label>' +
-      '<div class="dock-r"><button type="button" class="btn quiet tgl" data-action="talk" aria-pressed="' + talking + '" title="Abaixa os ambientes e a música enquanto você fala">' + (talking ? 'Falando…' : 'Falando') + '</button>' +
+      '<div class="dock-r">' + tvBtn() + '<button type="button" class="btn quiet tgl" data-action="talk" aria-pressed="' + talking + '" title="Abaixa os ambientes e a música enquanto você fala">' + (talking ? 'Falando…' : 'Falando') + '</button>' +
       '<button type="button" class="btn" data-action="stop">Parar tudo</button></div></div>';
   }
   let sbLast = '';
@@ -4008,6 +4148,12 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       render();
       return;
     }
+    if (a === 'tvOpen') { tvDlg = true; tvConnect(); renderTvDlg(); return; }
+    if (a === 'tvClose') { tvDlg = false; renderTvDlg(); return; }
+    if (a === 'tvSound') { tvSetSound(!TVC.sound); return; }
+    if (a === 'tvView') { TVC.view = id || 'auto'; tvSend({ t: 'view', v: TVC.view }); renderTvDlg(); return; }
+    if (a === 'tvSpotify') { tvSpotify(); return; }
+    if (a === 'tvSpLogin') { spLogin(); return; }
     if (a === 'talk') { setTalking(!talking); return; }
     if (a === 'stop') { stopAll(); render(); return; }
     if (a === 'fx') { playFx(findCue(id)); return; }
@@ -4057,6 +4203,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     if (a === 'reveal') {
       revealed = revealed === id ? null : id;
       if (revealed) publish(S.images.filter(function (im) { return im.id === revealed; })[0]); else campHide();
+      tvShowPush(true);
       render(); return;
     }
     if (a === 'spToggle') { spToggle().then(function () { setTimeout(spNowPoll, 1200); }); return; }
@@ -4079,6 +4226,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
         if (!audience.length) audience = ['todos'];
       }
       if (revealed) publish(S.images.filter(function (im) { return im.id === revealed; })[0]);
+      tvShowPush(true);
       render(); return;
     }
     if (a === 'noteAdd') { S.notes.push({ title: 'Nova nota', open: true, text: '' }); commit(); return; }
@@ -4211,13 +4359,14 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     if (t.id === 'vol-master') {
       S.vol = parseFloat(t.value);
       if (master) rampTo(master.gain, posToGain(S.vol, 1.5), 0.03);
+      tvSend({ t: 'vol', v: posToGain(S.vol, 1.5) });
       save();
       return;
     }
     if (t.getAttribute('data-vol')) {
       const id = t.getAttribute('data-vol'), c = findCue(id);
       levels[id] = parseFloat(t.value);
-      if (active[id] && c) rampTo(active[id].out.gain, posToGain(levels[id], 1.2) * ambK(c), 0.05);
+      if (active[id] && c) { if (active[id].remote) tvSend({ t: 'lvl', id: id, level: tvGain(c) }); else rampTo(active[id].out.gain, posToGain(levels[id], 1.2) * ambK(c), 0.05); }
     }
   });
 
@@ -4305,6 +4454,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     if (e.key === 'Escape' && histIsOpen()) { histClose(); const b = $('#histbtn'); if (b) b.focus(); return; }
     if (e.key === 'Escape' && !$('#jogdrawer').hidden) { $('#jogdrawer').hidden = true; return; }
     if (e.key === 'Escape' && libPick) { libPick = null; libStop(); renderPicker(); render(); }
+    else if (e.key === 'Escape' && tvDlg) { tvDlg = false; renderTvDlg(); }
     else if (e.key === 'Escape' && dlg) { dlg = null; renderDlg(); }
   });
 

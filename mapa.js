@@ -106,6 +106,8 @@
     '.mp-svg.dragging { cursor: grabbing; }',
     '.mp-svg text { font-family: var(--m-font); pointer-events: none; }',
     '.mp-tl, .mp-tr { position: absolute; top: 10px; z-index: 3; display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; pointer-events: none; }',
+    '.mp-tv .mp-tl, .mp-tv .mp-tr, .mp-tv .mp-sub, .mp-tv .mp-insp, .mp-tv .mp-read { display: none !important; }',
+    '.mp-tv .mp-svg { pointer-events: none; }',
     '.mp-tl { left: 10px; max-width: calc(100% - 20px); z-index: 6; }',
     '.mp.panel-open .mp-sub { left: calc(min(350px, 94%) + 10px); max-width: calc(100% - min(350px, 94%) - 20px); }',
     '.mp.panel-open .mp-insp { left: calc(min(350px, 94%) + 10px); width: min(330px, calc(100% - min(350px, 94%) - 20px)); }',
@@ -247,20 +249,22 @@
 
   function mount(host, ctx) {
     injectCss();
-    var api = ctx.api, cid = ctx.cid, uid = ctx.uid, owner = !!ctx.owner, sys = ctx.system || 'dnd5e';
+    var spect = !!ctx.spect; /* tela da mesa (TV): a conta é a do Mestre, mas mostra só o que os jogadores veem, sem ferramentas */
+    var api = ctx.api, cid = ctx.cid, uid = ctx.uid, owner = !!ctx.owner && !spect, sys = ctx.system || 'dnd5e';
+    var sfog = null, sfogFor = '';
     var maps = [], map = null, objs = {}, seq = 0, urls = {}, loads = {};
     var P = null, pImgUrl = '';
     var G = makeGeom({}), FG = null, fog = null, lastGeom = '';
     var tool = 'move', sel = null, ruler = null, drag = null, rdown = null, fstroke = null, frect = null, msgText = '';
     var fogMode = 'show', fogShape = 'brush', fogSize = 1, fogPrev = false, expanded = false, panelOpen = false;
-    var fitMode = lsGet('ht-map-fit', 'fill') === 'fit' ? 'fit' : 'fill';
+    var fitMode = ctx.spect ? 'fit' : (lsGet('ht-map-fit', 'fill') === 'fit' ? 'fit' : 'fill');
     var view = { x: 0, y: 0, k: 1 }, views = {}, atMin = true;
     var pend = {}, busy = {}, sendT = {}, hpBase = {}, hpT = {};
     var fight = null, fightRev = -1, fightBusy = false;
     var pts = {}, selDraw = false, editOpen = false, hpQty = 1, mode = null, gest = null, timers = [], dead = false, saveT = null, fogT = null, pubT = null, pubBusy = false, pubAgain = false, drawQ = 0, fogQ = 0, tick = 0, lastFull = 0;
 
     var toolsBox = null, fightBox = ctx.combatEl || null;
-    host.innerHTML = '<div class="mp' + (ctx.full ? ' full' : '') + (ctx.fill ? ' fill' : '') + '"><svg class="mp-svg" xmlns="http://www.w3.org/2000/svg"><defs class="mp-defs"></defs><g class="mp-w"><g class="L-img"></g><g class="L-grid"></g><g class="L-obj"></g><g class="L-fog"></g><g class="L-tok"></g><g class="L-hl"></g><g class="L-rul"></g><g class="L-ping"></g></g></svg>' +
+    host.innerHTML = '<div class="mp' + (ctx.full ? ' full' : '') + (ctx.fill ? ' fill' : '') + (spect ? ' mp-tv' : '') + '"><svg class="mp-svg" xmlns="http://www.w3.org/2000/svg"><defs class="mp-defs"></defs><g class="mp-w"><g class="L-img"></g><g class="L-grid"></g><g class="L-obj"></g><g class="L-fog"></g><g class="L-tok"></g><g class="L-hl"></g><g class="L-rul"></g><g class="L-ping"></g></g></svg>' +
       '<div class="mp-tl"></div><div class="mp-tr"></div><div class="mp-sub" hidden></div><div class="mp-banner" hidden></div><div class="mp-read" hidden></div><div class="mp-insp" hidden></div><div class="mp-empty" hidden></div>' +
       (owner && !ctx.toolsEl ? '<aside class="mp-side" hidden aria-label="Ferramentas do mapa"></aside>' : '') + '</div>';
     var $ = function (s) { return host.querySelector(s); };
@@ -685,9 +689,27 @@
     function refresh() { bars(); empty(); panel(); insp(); fightPanel(); }
 
     /* ---------- leitura ---------- */
+    /* tela da mesa: a conta do Mestre recebe tudo do banco, então o que está escondido ou sob a névoa é descartado aqui */
+    function spVis(r) {
+      if (r.hidden) return false;
+      if (!sfog || r.cell == null) return true;
+      if (r.cell < 0 || r.cell >= sfog.n || r.cell >= sfog.bits.length * 8) return false;
+      return bit(sfog.bits, r.cell);
+    }
+    async function spFogLoad(mid, rev) {
+      var key = mid + ':' + rev;
+      if (sfogFor === key) return;
+      var rows = await j('/rest/v1/maps?id=eq.' + mid + '&select=fog,fog_cols,fog_rows');
+      var m = rows && rows[0];
+      if (!m) throw new Error('mapa');
+      var bits = m.fog ? b64d(m.fog) : null;
+      sfog = m.fog ? { bits: bits || new Uint8Array(0), n: (m.fog_cols || 0) * (m.fog_rows || 0) } : null;
+      sfogFor = key;
+    }
     function ingest(rows) {
       var ch = false;
       rows.forEach(function (r) {
+        if (spect && !r.gone && !spVis(r)) r = { id: r.id, seq: r.seq, gone: true };
         var old = objs[r.id], hold = (pend[r.id] || (busy[r.id] && busy[r.id] > Date.now())) && old;
         if (r.seq > seq) seq = r.seq;
         if (hold) return;
@@ -734,11 +756,12 @@
       try {
         var rows = await j('/rest/v1/map_views?campaign_id=eq.' + cid + '&shown=eq.true&select=map_id,name,view,pimg,rev');
         var v = rows && rows[0] ? rows[0] : null;
-        if (!v) { if (P) { views[P.map_id] = view; P = null; pImgUrl = ''; objs = {}; seq = 0; drawAll(); refresh(); } else empty(); return; }
+        if (!v) { if (P) { views[P.map_id] = view; P = null; pImgUrl = ''; objs = {}; seq = 0; drawAll(); refresh(); } else empty(); spState(); return; }
         var newMap = !P || P.map_id !== v.map_id;
         if (!newMap && P.rev === v.rev) return;
         var oldImg = P && P.pimg;
-        if (newMap) { if (P) views[P.map_id] = view; objs = {}; seq = 0; }
+        if (spect) await spFogLoad(v.map_id, v.rev);
+        if (newMap || spect) { if (P && newMap) views[P.map_id] = view; objs = {}; seq = 0; }
         if (v.pimg && v.pimg !== oldImg) { var u = await loadUrl('mapas/' + v.pimg); if (!u) return; pImgUrl = u; }
         else if (!v.pimg) pImgUrl = '';
         P = v;
@@ -747,8 +770,11 @@
         else if (atMin) fit(); else { clampView(); applyView(); }
         refresh();
         pollObjs(true);
+        spState();
       } catch (e) { /* tenta no próximo ciclo */ }
     }
+    var spLast = null;
+    function spState() { if (!spect || !ctx.onShown) return; var on = !!(P && P.pimg && P.view && P.view.crop); if (on !== spLast) { spLast = on; try { ctx.onShown(on, P ? P.name || '' : ''); } catch (e) { /* ok */ } } }
     function setMap(m, keepSel) {
       if (map) views[map.id] = view;
       var same = !!(m && map && m.id === map.id);
