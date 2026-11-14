@@ -809,6 +809,25 @@ input[type="search"] { -webkit-appearance: none; appearance: none; width: 100%; 
 .cd-pip { width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); }
 .cd-pip.on { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px -3px var(--accent); }
 .cd.done .trk-n { color: var(--accent); }
+.spm-slot:empty { display: none; }
+.spm { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: clamp(250px, 30vw, 380px); padding: 4px 6px 4px 4px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); }
+.spm.on { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.spm img, .spm-ph { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: var(--surface-2); display: grid; place-items: center; color: var(--muted); }
+.spm-ph svg { width: 20px; height: 20px; }
+.spm-t { min-width: 0; display: grid; gap: 1px; }
+.spm-n { font-weight: 700; font-size: 14px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spm-a { color: var(--muted); font-size: 12px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spm-bar { height: 3px; margin-top: 3px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.spm-bar i { display: block; height: 100%; border-radius: inherit; background: var(--muted); }
+.spm.on .spm-bar i { background: var(--ok); }
+.spm-c { display: flex; align-items: center; gap: 2px; }
+.spm-b { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--fg); }
+.spm-b svg { width: 22px; height: 22px; }
+.spm-b:hover { background: var(--surface-2); }
+.spm-b:disabled { opacity: 0.35; }
+.spm-b.main { background: var(--active); color: var(--active-ink); border-radius: 50%; }
+.spm-b.main svg { width: 20px; height: 20px; }
+@media (max-width: 760px) { .spm { width: 100%; } .spm-slot { flex: 1 1 100%; } }
 .dock-r { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tgl[aria-pressed="true"] { background: var(--active); border-color: var(--active); color: var(--active-ink); box-shadow: 0 0 22px -6px var(--glow); }
 .vol { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); flex: 1 1 0; min-width: 130px; max-width: 340px; }
@@ -1140,7 +1159,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.72';
+  const APP_VER = '0.73';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -1150,6 +1169,8 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     next: SV('<path d="m9 6 6 6-6 6"/>'),
     up: SV('<path d="m6 15 6-6 6 6"/>'),
     down: SV('<path d="m6 9 6 6 6-6"/>'),
+    skipb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2.4v14H6zM19 5.2v13.6L9.6 12z" fill="currentColor"/></svg>',
+    skipf: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 5H18v14h-2.4zM5 5.2v13.6L14.4 12z" fill="currentColor"/></svg>',
     play: '<svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.8v14.4L19 12z" fill="currentColor"/></svg>',
     pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z" fill="currentColor"/></svg>',
     stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>',
@@ -2774,6 +2795,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     el.classList.toggle('paused', !!(spNow && !spNow.playing));
     el.innerHTML = spNowHtml();
   }
+  function paintSpAll() { paintSpNow(); paintSpMini(); }
   async function spNowPoll() {
     if (spNowBusy || mode !== 'mesa' || document.hidden || !SP.enabled || !spStore.get()) return;
     spNowBusy = true;
@@ -2785,14 +2807,16 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       spNow = n; spNowAt = Date.now();
       const playing = !!(n && n.playing);
       if (playing !== spPlaying) { spPlaying = playing; render(); return; }
-      paintSpNow();
+      paintSpAll();
     } finally { spNowBusy = false; }
   }
   function spNowTick() {
     if (!spNow || !spNow.playing) return;
-    const el = $('#sp-now');
-    if (!el || el.hidden) return;
-    const pos = spNowPos(), bar = el.querySelector('.sp-now-bar i'), tm = el.querySelector('.sp-now-tm span');
+    const el = $('#sp-now'), mb = document.querySelector('#spm .spm-bar i');
+    const pos = spNowPos();
+    if (mb) mb.style.width = (spNow.dur ? Math.min(100, pos / spNow.dur * 100) : 0).toFixed(1) + '%';
+    if (!el || el.hidden) { if (spNow.dur && pos >= spNow.dur) spNowPoll(); return; }
+    const bar = el.querySelector('.sp-now-bar i'), tm = el.querySelector('.sp-now-tm span');
     if (bar) bar.style.width = (spNow.dur ? Math.min(100, pos / spNow.dur * 100) : 0).toFixed(1) + '%';
     if (tm) tm.textContent = mmss(pos);
     if (spNow.dur && pos >= spNow.dur) spNowPoll();
@@ -2800,6 +2824,48 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   setInterval(spNowPoll, 5000);
   setInterval(spNowTick, 1000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) spNowPoll(); });
+  /* mini-player do rodapé: capa, nome, voltar, tocar/pausar e pular; vale na Mesa e no Jogo */
+  let spSkipBusy = false;
+  function spMiniHtml() {
+    if (!SP.enabled || !spStore.get() || spModeGet() === 'app') return '';
+    const n = spNow, playing = !!(n && n.playing);
+    const pos = spNowPos(), pct = n && n.dur ? Math.min(100, pos / n.dur * 100) : 0;
+    return '<div class="spm' + (playing ? ' on' : '') + '" id="spm" role="group" aria-label="Spotify">' +
+      (n && n.img ? '<img src="' + esc(n.img) + '" alt="">' : '<span class="spm-ph">' + ICO.note + '</span>') +
+      '<div class="spm-t"><p class="spm-n">' + esc(n ? n.name : 'Spotify') + '</p><p class="spm-a">' + esc(n ? (n.by || n.dev || '') : 'Nada tocando') + '</p><div class="spm-bar" aria-hidden="true"><i style="width:' + pct.toFixed(1) + '%"></i></div></div>' +
+      '<div class="spm-c"><button type="button" class="spm-b" data-action="spPrev" aria-label="Música anterior" title="Anterior"' + (n ? '' : ' disabled') + '>' + ICO.skipb + '</button>' +
+      '<button type="button" class="spm-b main" data-action="spPP" aria-label="' + (playing ? 'Pausar' : 'Tocar') + '" title="' + (playing ? 'Pausar' : 'Tocar') + '">' + (playing ? ICO.pause : ICO.play) + '</button>' +
+      '<button type="button" class="spm-b" data-action="spNext" aria-label="Próxima música" title="Próxima"' + (n ? '' : ' disabled') + '>' + ICO.skipf + '</button></div></div>';
+  }
+  function paintSpMini() { const el = $('#spm-slot'); if (el) el.innerHTML = spMiniHtml(); }
+  async function spSkip(dir) {
+    if (spSkipBusy) return;
+    spSkipBusy = true;
+    try {
+      const dq = spCurDev ? '?device_id=' + encodeURIComponent(spCurDev) : '';
+      let r = await spApi('POST', '/me/player/' + (dir > 0 ? 'next' : 'previous') + dq);
+      if (r.status === 404 && dq) r = await spApi('POST', '/me/player/' + (dir > 0 ? 'next' : 'previous'));
+      if (r.status === 401) { spStore.clear(); toast('A conexão com o Spotify expirou. Conecte de novo.'); render(); return; }
+      if (r.status === 403) { toast(dir > 0 ? 'O Spotify não deixou pular (fim da lista ou faixa única).' : 'O Spotify não deixou voltar esta faixa.'); return; }
+      if (!spOk(r.status)) { toast('Não consegui ' + (dir > 0 ? 'pular' : 'voltar') + ' a música (resposta ' + r.status + ').'); return; }
+      if (spNow) { spNow.pos = 0; spNowAt = Date.now(); }
+      setTimeout(spNowPoll, 700); setTimeout(spNowPoll, 2200);
+    } finally { spSkipBusy = false; }
+  }
+  async function spPlayPause() {
+    if (!spNow) { await spToggle(); setTimeout(spNowPoll, 1200); return; }
+    const dq = spCurDev ? '?device_id=' + encodeURIComponent(spCurDev) : '';
+    if (spNow.playing) {
+      const r = await spApi('PUT', '/me/player/pause');
+      if (spOk(r.status)) { spNow.pos = spNowPos(); spNowAt = Date.now(); spNow.playing = false; spPlaying = false; spResume = mus().url; render(); }
+      else toast('Não consegui pausar (resposta ' + r.status + ').');
+    } else {
+      const r = await spApi('PUT', '/me/player/play' + dq);
+      if (spOk(r.status)) { spNowAt = Date.now(); spNow.playing = true; spPlaying = true; render(); }
+      else { await spToggle(); }
+    }
+    setTimeout(spNowPoll, 1200);
+  }
   function spNowBox() { return spStore.get() ? '<div class="sp-now' + (spNow && !spNow.playing ? ' paused' : '') + '" id="sp-now"' + (spNow ? '' : ' hidden') + '>' + spNowHtml() + '</div>' : ''; }
   function musicHtml() {
     const t = mus(), n = S.tracks.length;
@@ -3674,6 +3740,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     dock.innerHTML = '<div class="dock-in">' + (showFear ? '<div class="trk-g fear" role="group" aria-label="Medo do Mestre"><span class="trk-n">Medo</span>' +
       '<button type="button" class="rnd" data-action="fear" data-d="-1" aria-label="Gastar um Medo">−</button><output class="fear-v" aria-live="polite">' + S.fear + '</output>' +
       '<button type="button" class="rnd" data-action="fear" data-d="1" aria-label="Ganhar um Medo">+</button><span class="fear-pips" aria-hidden="true">' + pips + '</span></div>' : '') + cdh +
+      '<div class="spm-slot" id="spm-slot">' + spMiniHtml() + '</div>' +
       '<label class="vol" title="Volume dos sons">' + ICO.vol + '<span class="lbl-s">Volume dos sons</span><input type="range" id="vol-master" min="0" max="1" step="0.005" value="' + S.vol + '" aria-label="Volume dos sons"></label>' +
       '<div class="dock-r"><button type="button" class="btn quiet tgl" data-action="talk" aria-pressed="' + talking + '" title="Abaixa os ambientes e a música enquanto você fala">' + (talking ? 'Falando…' : 'Falando') + '</button>' +
       '<button type="button" class="btn" data-action="stop">Parar tudo</button></div></div>';
@@ -3993,6 +4060,9 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       render(); return;
     }
     if (a === 'spToggle') { spToggle().then(function () { setTimeout(spNowPoll, 1200); }); return; }
+    if (a === 'spNext') { spSkip(1); return; }
+    if (a === 'spPrev') { spSkip(-1); return; }
+    if (a === 'spPP') { spPlayPause(); return; }
     if (a === 'spDevices') { spLoadDevices(); return; }
     if (a === 'spDev') { const x = spList && spList[i]; if (x) { spDev.set({ id: x.id, name: x.name }); spList = null; spSay('Vai tocar em ' + x.name + '.'); } return; }
     if (a === 'spMode') { spModeSet(id); spFailed = false; spMsg = ''; render(); return; }
