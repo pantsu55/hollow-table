@@ -110,7 +110,7 @@ button { cursor: pointer; }
 (function () {
   'use strict';
   const SBC = { url: 'https://ksucnjrmcagzepxahync.supabase.co', key: 'sb_publishable_zg_rPvJ15I_wbaFZ2qemeg_Xnsalgsh' };
-  const VER = '2';
+  const VER = '3';
   const $ = function (s) { return document.querySelector(s); };
   const lsGet = function (k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
   const lsSet = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ } };
@@ -168,7 +168,7 @@ button { cursor: pointer; }
       lim.threshold.value = -6; lim.knee.value = 4; lim.ratio.value = 20; lim.attack.value = 0.003; lim.release.value = 0.25;
       master.connect(lim); lim.connect(ctx.destination);
       fxBus = ctx.createGain(); fxBus.connect(master);
-      ambBus = ctx.createGain(); ambBus.connect(master);
+      ambBus = ctx.createGain(); ambBus.gain.value = ST.talk ? DUCK : 1; ambBus.connect(master);
       ctx.onstatechange = function () { hello(); };
     }
     if (ctx.state !== 'running') ctx.resume().catch(function () { /* precisa de um toque */ });
@@ -195,19 +195,6 @@ button { cursor: pointer; }
     if (!urls[path]) urls[path] = media(path).then(function (r) { return r.blob(); }).then(function (b) { return URL.createObjectURL(b); }).catch(function (e) { delete urls[path]; throw e; });
     return urls[path];
   }
-  /* endereço temporário para a TV tocar o arquivo aos poucos (ambientes têm vários MB: baixar inteiro antes travava tudo) */
-  const signed = {};
-  async function streamUrl(path) {
-    const c = signed[path];
-    if (c && c.exp > Date.now() + 60000) return c.url;
-    const tok = await token();
-    const r = await fetch(SBC.url + '/storage/v1/object/sign/media/' + path, { method: 'POST', headers: { apikey: SBC.key, Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 21600 }) });
-    if (!r.ok) throw new Error('endereço ' + r.status);
-    const j = await r.json(), u = j.signedURL || j.signedUrl;
-    if (!u) throw new Error('endereço vazio');
-    signed[path] = { url: SBC.url + '/storage/v1' + u, exp: Date.now() + 21600000 };
-    return signed[path].url;
-  }
   /* efeito pelo elemento <audio>: plano B quando o Web Audio não decodifica ou não está rodando */
   async function fxElement(path) {
     const el = new Audio(await blobUrl(path));
@@ -230,37 +217,146 @@ button { cursor: pointer; }
       try { await fxElement(path); hello(); } catch (e2) { fail('fxErr', e2 || e); say('Não consegui tocar um efeito.'); }
     }
   }
-  /* ambientes: um <audio> em laço para cada um, tocando direto da nuvem; o volume é o do ambiente x geral x "falando" */
-  function ambVol(a) { return Math.max(0, Math.min(1, a.level * 0.6 * ST.vol * (ST.talk ? DUCK : 1))); }
-  function fade(a, to, sec, done) {
-    clearInterval(a.ft);
-    const el = a.el, from = el.volume, n = Math.max(1, Math.round(sec * 20)); let k = 0;
-    a.ft = setInterval(function () { k++; try { el.volume = Math.max(0, Math.min(1, from + (to - from) * k / n)); } catch (e) { /* ok */ } if (k >= n) { clearInterval(a.ft); if (done) done(); } }, 50);
+  /* ---------- ambientes pelo Web Audio, em pedaços ----------
+     Nesta TV só um <audio> comum toca por vez (e o Spotify é um deles), mas o Web Audio se mistura com tudo.
+     Então o ambiente (um MP3 de vários MB) é baixado aos poucos e decodificado em trechos de ~10 s,
+     que são agendados um depois do outro com uma emenda cruzada curta. Assim vários ambientes tocam juntos,
+     por cima do Spotify, sem decodificar o arquivo inteiro na memória. */
+  const XF = 0.06, CHUNK = 10, AHEAD = 12, PRE = 10, BR1 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320], BR2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160], SRT = [[11025, 12000, 8000], null, [22050, 24000, 16000], [44100, 48000, 32000]];
+  function mp3Head(d, o) {
+    if (d[o] !== 0xFF || (d[o + 1] & 0xE0) !== 0xE0) return null;
+    const ver = (d[o + 1] >> 3) & 3, layer = (d[o + 1] >> 1) & 3, bi = d[o + 2] >> 4, si = (d[o + 2] >> 2) & 3;
+    if (ver === 1 || layer !== 1 || bi === 0 || bi === 15 || si === 3) return null;
+    const sr = SRT[ver][si], br = (ver === 3 ? BR1 : BR2)[bi] * 1000, pad = (d[o + 2] >> 1) & 1;
+    const n = Math.floor((ver === 3 ? 144 : 72) * br / sr) + pad;
+    return n > 20 ? { n: n, sr: sr, spf: ver === 3 ? 1152 : 576 } : null;
   }
-  function ambRefresh() { Object.keys(ambs).forEach(function (id) { const a = ambs[id]; if (a.el && a.live) fade(a, ambVol(a), 0.25); }); }
-  async function ambOn(id, path, level) {
+  const mp3Cache = {}; let mp3Bytes = 0;
+  function mp3File(path) {
+    if (mp3Cache[path]) { mp3Cache[path].used = Date.now(); return mp3Cache[path]; }
+    const F = { path: path, data: new Uint8Array(0), len: 0, pos: -1, fo: [], fn: [], sr: 0, spf: 0, done: false, bad: '', total: 0, used: Date.now(), subs: [], ctl: null };
+    const tell = function () { F.subs.slice().forEach(function (fn) { try { fn(); } catch (e) { /* ok */ } }); };
+    function add(chunk) {
+      if (F.len + chunk.length > F.data.length) { const nd = new Uint8Array(Math.max(F.len + chunk.length, F.data.length * 2, 1 << 20)); nd.set(F.data.subarray(0, F.len)); F.data = nd; }
+      F.data.set(chunk, F.len); F.len += chunk.length;
+    }
+    function parse(fin) {
+      const d = F.data;
+      if (F.pos < 0) {
+        if (F.len < 10 && !fin) return;
+        F.pos = 0;
+        if (d[0] === 0x49 && d[1] === 0x44 && d[2] === 0x33) F.pos = 10 + ((d[6] & 127) << 21 | (d[7] & 127) << 14 | (d[8] & 127) << 7 | (d[9] & 127)) + ((d[5] & 16) ? 10 : 0);
+      }
+      let o = F.pos, junk = 0;
+      while (o + 4 <= F.len) {
+        const h = mp3Head(d, o);
+        if (!h || (F.sr && h.sr !== F.sr)) { o++; if (++junk > 200000 && !F.fo.length) { F.bad = 'não é MP3'; break; } continue; }
+        if (o + h.n + 4 > F.len) { if (!fin) break; if (o + h.n > F.len) break; }
+        else if (!mp3Head(d, o + h.n)) { o++; junk++; continue; } /* falso início: o quadro seguinte tem de começar logo depois */
+        if (!F.fo.length) {
+          F.sr = h.sr; F.spf = h.spf;
+          let tag = false; for (let k = o + 4; k < o + Math.min(h.n, 180) - 4 && !tag; k++) { const c = d[k]; if ((c === 0x58 || c === 0x49 || c === 0x56) && /^(Xing|Info|VBRI)$/.test(String.fromCharCode(d[k], d[k + 1], d[k + 2], d[k + 3]))) tag = true; }
+          if (tag) { o += h.n; F.pos = o; continue; } /* quadro de informações do arquivo: não é som */
+        }
+        F.fo.push(o); F.fn.push(h.n); o += h.n; junk = 0;
+      }
+      F.pos = o;
+      if (fin && !F.fo.length && !F.bad) F.bad = 'não é MP3';
+    }
+    (async function () {
+      try {
+        F.ctl = window.AbortController ? new AbortController() : null;
+        const tok = await token();
+        const r = await fetch(SBC.url + '/storage/v1/object/authenticated/media/' + path, { headers: { apikey: SBC.key, Authorization: 'Bearer ' + tok }, signal: F.ctl ? F.ctl.signal : undefined });
+        if (!r.ok) throw new Error('arquivo ' + r.status);
+        const total = F.total = +r.headers.get('content-length') || 0;
+        if (total) F.data = new Uint8Array(total);
+        if (r.body && r.body.getReader) {
+          const rd = r.body.getReader();
+          for (;;) { const x = await rd.read(); if (x.done) break; add(x.value); parse(false); tell(); if (F.bad && !(total && total < 6e6)) { try { rd.cancel(); } catch (e) { /* ok */ } break; } } /* arquivo pequeno que não é MP3: termina de baixar para tocar inteiro */
+        } else add(new Uint8Array(await r.arrayBuffer()));
+        parse(true); F.done = true; F.ctl = null;
+        mp3Bytes += F.len;
+        /* guarda os últimos arquivos para religar na hora; solta os mais antigos acima de 70 MB */
+        Object.keys(mp3Cache).sort(function (a, b) { return mp3Cache[a].used - mp3Cache[b].used; }).forEach(function (k) { if (mp3Bytes > 70e6 && k !== path && !mp3Cache[k].subs.length) { mp3Bytes -= mp3Cache[k].len; delete mp3Cache[k]; } });
+      } catch (e) { F.bad = F.bad || String(e && e.message ? e.message : e); delete mp3Cache[path]; }
+      tell();
+    })();
+    return (mp3Cache[path] = F);
+  }
+  function ambOn(id, path, level) {
     if (!id || !path) return;
     if (ambs[id]) { if (ambs[id].path === path) { ambLevel(id, level); return; } ambOff(id); }
-    const a = ambs[id] = { path: path, level: level, el: null, live: false, dead: false, ft: null };
-    try {
-      const u = await streamUrl(path);
-      if (a.dead || ambs[id] !== a) return;
-      const el = new Audio(); el.loop = true; el.preload = 'auto'; el.volume = 0; el.src = u;
-      a.el = el;
-      el.addEventListener('error', function () { if (ambs[id] === a) { delete ambs[id]; fail('ambErr', 'arquivo não abriu (' + (el.error ? el.error.code : '?') + ')'); say('Não consegui tocar um ambiente.'); } });
-      await el.play();
-      if (a.dead) { el.pause(); return; }
-      a.live = true; DG.amb++;
-      fade(a, ambVol(a), FADE); hello();
-    } catch (e) { if (ambs[id] === a) delete ambs[id]; fail('ambErr', e); say('Não consegui tocar um ambiente.'); }
+    ensure();
+    const out = ctx.createGain(); out.gain.value = 0.0001; out.connect(ambBus);
+    const a = ambs[id] = { path: path, level: level, out: out, live: false, dead: false, F: null, fi: 0, end: 0, busy: false, srcs: [], bad: 0, timer: null, log: [] };
+    const F = a.F = mp3File(path);
+    function giveUp(why) {
+      if (a.dead) return;
+      /* arquivo que não é MP3 (ou que não decodificou em pedaços): tenta inteiro, se for pequeno; senão avisa */
+      if (!F.done && F.total && F.total < 6e6 && !/arquivo \d/.test(why)) return; /* ainda baixando: a próxima chamada decide */
+      if (F.done && F.len && F.len < 6e6 && !a.triedWhole) {
+        a.triedWhole = true;
+        a.busy = true;
+        ctx.decodeAudioData(F.data.slice(0, F.len).buffer, function (ab) { if (a.dead) return; const s = ctx.createBufferSource(); s.buffer = ab; s.loop = true; s.connect(out); s.start(); a.srcs.push(s); a.whole = true; go(); }, function () { fin('formato não suportado'); });
+        return;
+      }
+      fin(why);
+    }
+    function fin(why) { if (ambs[id] === a) { ambOff(id); fail('ambErr', why); say('Não consegui tocar um ambiente.'); } }
+    function go() { if (a.live || a.dead) return; a.live = true; DG.amb++; ramp(out.gain, a.level * 0.6, FADE); hello(); }
+    function sched(ab, n, pre) {
+      if (a.dead) return;
+      const now = ctx.currentTime, first = !a.end;
+      const body = n * F.spf / F.sr, lead = pre * F.spf / F.sr >= XF ? XF : 0;
+      const play = Math.min(ab.duration, body + lead), off = Math.max(0, ab.duration - play); /* alinha pelo fim: quadros perdidos pelo decodificador ficam no começo */
+      let at = first ? now + 0.06 : a.end - XF;
+      if (at < now + 0.01) at = now + 0.01; /* atrasou: segue em frente em vez de empilhar */
+      const s = ctx.createBufferSource(), g = ctx.createGain();
+      s.buffer = ab; s.connect(g); g.connect(out);
+      const stop = at + play;
+      if (first) g.gain.setValueAtTime(1, at); else { g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(1, at + XF); }
+      g.gain.setValueAtTime(1, Math.max(at + XF, stop - XF)); g.gain.linearRampToValueAtTime(0.0001, stop);
+      s.start(at, off);
+      s.onended = function () { try { g.disconnect(); } catch (e) { /* ok */ } const k = a.srcs.indexOf(s); if (k >= 0) a.srcs.splice(k, 1); };
+      a.srcs.push(s); a.end = stop; a.log.push([at, play, off]); if (a.log.length > 40) a.log.shift();
+      go();
+    }
+    function pump() {
+      if (a.dead || a.busy || a.whole) return;
+      if (F.bad || a.triedWhole) { giveUp(F.bad || 'não consegui decodificar'); return; }
+      if (a.end && a.end - ctx.currentTime > AHEAD) return;
+      const want = Math.max(4, Math.ceil(CHUNK * F.sr / (F.spf || 1152)));
+      let have = F.fo.length - a.fi;
+      if (have <= 0 && F.done) { if (!F.fo.length) { giveUp('arquivo vazio'); return; } a.fi = 0; have = F.fo.length; } /* fim do arquivo: recomeça (laço) */
+      if (have < want && !F.done) return; /* espera chegar mais */
+      const from = a.fi, to = Math.min(F.fo.length, from + want), pre = Math.min(from, PRE);
+      const b0 = F.fo[from - pre], b1 = F.fo[to - 1] + F.fn[to - 1];
+      a.busy = true;
+      ctx.decodeAudioData(F.data.slice(b0, b1).buffer, function (ab) {
+        a.busy = false; a.bad = 0; a.fi = to;
+        sched(ab, to - from, pre); pump();
+      }, function () {
+        a.busy = false; a.fi = to;
+        if (++a.bad >= 3) giveUp('não consegui decodificar'); else pump();
+      });
+    }
+    a.pump = pump;
+    F.subs.push(pump);
+    a.timer = setInterval(pump, 500);
+    pump();
   }
-  function ambLevel(id, level) { const a = ambs[id]; if (!a) return; a.level = level; if (a.el && a.live) fade(a, ambVol(a), 0.1); }
+  function ambLevel(id, level) { const a = ambs[id]; if (!a) return; a.level = level; if (a.live) ramp(a.out.gain, level * 0.6, 0.1); }
   function ambOff(id) {
     const a = ambs[id]; if (!a) return;
     delete ambs[id]; a.dead = true;
-    if (!a.el) return;
-    fade(a, 0, FADE / 4, function () { try { a.el.pause(); a.el.removeAttribute('src'); a.el.load(); } catch (e) { /* já solto */ } });
+    clearInterval(a.timer);
+    const k = a.F.subs.indexOf(a.pump); if (k >= 0) a.F.subs.splice(k, 1);
+    if (!a.F.done && !a.F.subs.length && a.F.ctl) { try { a.F.ctl.abort(); } catch (e) { /* ok */ } delete mp3Cache[a.path]; } /* ninguém mais quer: para de baixar */
+    ramp(a.out.gain, 0, FADE / 4);
+    setTimeout(function () { a.srcs.forEach(function (s) { try { s.stop(); } catch (e) { /* já parou */ } }); try { a.out.disconnect(); } catch (e) { /* já solto */ } }, FADE * 1000 / 4 + 250);
   }
+  function ambRefresh() { if (ambBus) ramp(ambBus.gain, ST.talk ? DUCK : 1, 0.3); }
   function stopAll() {
     Object.keys(ambs).forEach(ambOff);
     if (ctx) { try { fxBus.disconnect(); } catch (e) { /* ok */ } fxBus = ctx.createGain(); fxBus.connect(master); }
@@ -270,21 +366,11 @@ button { cursor: pointer; }
   function preNext() { while (preBusy < 2 && preQ.length) { const p = preQ.shift(); if (bufs[p]) continue; preBusy++; buffer(p).catch(function () { /* tenta de novo quando tocar */ }).then(function () { preBusy--; preNext(); }); } }
   function preload(list) { (list || []).slice(0, 80).forEach(function (c) { if (c && c.path && !c.amb && preQ.indexOf(c.path) < 0) preQ.push(c.path); }); preNext(); }
   /* teste pedido pelo app: um toque gerado na hora, pelo Web Audio ('wa') ou por um <audio> ('el') */
-  function testWav() {
-    const sr = 22050, n = Math.round(sr * 0.9), b = new Uint8Array(44 + n * 2), v = new DataView(b.buffer);
-    const w = function (o, t) { for (let i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
-    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
-    for (let i = 0; i < n; i++) { const t = i / sr, env = Math.min(1, t * 40) * Math.exp(-t * 4); v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * (t < 0.3 ? 660 : 880) * t) * env * 14000), true); }
-    return URL.createObjectURL(new Blob([b], { type: 'audio/wav' }));
-  }
   async function soundTest(how) {
     try {
-      if (how === 'el') { const el = new Audio(testWav()); el.volume = 1; await el.play(); }
-      else {
-        ensure();
-        if (ctx.state !== 'running') throw new Error('Web Audio parado (' + ctx.state + ')');
-        [660, 880].forEach(function (hz, k) { const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + k * 0.3; o.frequency.value = hz; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.35, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(g); g.connect(fxBus); o.start(t); o.stop(t + 0.65); });
-      }
+      ensure();
+      if (ctx.state !== 'running') throw new Error('Web Audio parado (' + ctx.state + ')');
+      [660, 880].forEach(function (hz, k) { const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + k * 0.3; o.type = how === 'el' ? 'triangle' : 'sine'; o.frequency.value = how === 'el' ? hz / 2 : hz; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.35, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(g); g.connect(how === 'el' ? ambBus : fxBus); o.start(t); o.stop(t + 0.65); });
       say(how === 'el' ? 'Teste de som (ambientes) tocando…' : 'Teste de som (efeitos) tocando…');
       send({ t: 'tested', how: how, ok: true });
     } catch (e) { send({ t: 'tested', how: how, ok: false, err: String(e && e.message ? e.message : e).slice(0, 90) }); say('O teste de som falhou.'); }
@@ -441,7 +527,7 @@ button { cursor: pointer; }
     clearTimeout(curT); curT = setTimeout(function () { document.body.classList.add('idle-cursor'); }, 5000);
   }
   ['mousemove', 'keydown', 'pointerdown'].forEach(function (ev) { document.addEventListener(ev, poke, { passive: true }); });
-  window.HTTV = { state: ST, sp: SPT, ambs: ambs, audioOn: audioOn };
+  window.HTTV = { state: ST, sp: SPT, ambs: ambs, audioOn: audioOn, mp3File: mp3File, ambOn: ambOn, ambOff: ambOff, ctx: function () { return ctx; } };
   boot();
 })();
 </script>

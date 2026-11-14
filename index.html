@@ -1174,7 +1174,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.75';
+  const APP_VER = '0.76';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -3159,8 +3159,14 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
   const ambLevel = function (c) { if (levels[c.id] == null) levels[c.id] = gainToPos(c.src === 'file' ? 0.6 : LIB[c.id].level, 1.2); return levels[c.id]; };
   const findCue = function (id) { return S.cues.filter(function (c) { return c.id === id; })[0]; };
 
-  function playFx(c) {
-    if (tvSound() && tvCueOk(c)) {
+  function playFx(c, local) {
+    /* efeito sintetizado com o som na TV: vira um arquivo (uma vez só) e toca lá; se não der, toca aqui */
+    if (!local && tvSound() && c.src === 'synth' && LIB[c.id] && LIB[c.id].kind === 'fx') {
+      tvSynthPath(c.id).then(function (path) { if (tvSound()) tvSend({ t: 'fx', id: c.id, path: path }); else playFx(c, true); }, function () { playFx(c, true); });
+      $$('[data-action="fx"][data-id="' + c.id + '"]').forEach(function (btn) { btn.classList.add('playing'); setTimeout(function () { btn.classList.remove('playing'); }, Math.min(dur(c), 4) * 1000); });
+      return;
+    }
+    if (!local && tvSound() && tvCueOk(c)) {
       tvSend({ t: 'fx', id: c.id, path: c.path });
       $$('[data-action="fx"][data-id="' + c.id + '"]').forEach(function (btn) { btn.classList.add('playing'); setTimeout(function () { btn.classList.remove('playing'); }, Math.min(dur(c), 4) * 1000); });
       return;
@@ -3287,6 +3293,36 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     tvSend(sh ? { t: 'show', path: sh.path, caption: sh.caption } : { t: 'show', path: null });
     if (warn && revealed && !sh) toast(audience.indexOf('todos') < 0 ? 'Imagem só para alguns jogadores: ela não vai para a TV.' : 'Esta imagem ainda não subiu para a nuvem, então não aparece na TV.');
   }
+  /* sons sintetizados (os da aventura de exemplo) não existem como arquivo: este aparelho gera o som fora do ar,
+     grava um WAV na nuvem uma única vez e a TV toca esse arquivo como qualquer outro efeito */
+  const tvSyn = {};
+  function wav16(buf) {
+    const d = buf.getChannelData(0), n = d.length, b = new ArrayBuffer(44 + n * 2), v = new DataView(b);
+    const w = function (o, t) { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, buf.sampleRate, true); v.setUint32(28, buf.sampleRate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, d[i])) * 32767, true);
+    return new Blob([b], { type: 'audio/wav' });
+  }
+  function tvSynthPath(id) {
+    if (tvSyn[id]) return tvSyn[id];
+    const u = sbUser(), L = LIB[id];
+    if (!u || !L || L.kind !== 'fx') return Promise.reject(new Error('sem som'));
+    const path = u.id + '/tv-synth-' + id + '-v1.wav', done = lsGet('ht-tv-syn', {});
+    if (done[path]) return (tvSyn[id] = Promise.resolve(path));
+    return (tvSyn[id] = (async function () {
+      const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, sr = 44100;
+      const off = new OAC(1, Math.ceil((L.dur + 0.6) * sr), sr), keep = [ctx, fxBus, noiseBuf];
+      try { ctx = off; fxBus = off.createGain(); fxBus.connect(off.destination); noiseBuf = makeNoise(); L.play(0.02); }
+      finally { ctx = keep[0]; fxBus = keep[1]; noiseBuf = keep[2]; }
+      const buf = await off.startRendering();
+      await sbUpload(path, wav16(buf), 'audio/wav');
+      const m = lsGet('ht-tv-syn', {}); m[path] = 1; lsSet('ht-tv-syn', m);
+      return path;
+    })().catch(function (e) { delete tvSyn[id]; throw e; }));
+  }
+  function tvSynthPrep() {
+    S.cues.forEach(function (c) { if (c.src === 'synth' && LIB[c.id] && LIB[c.id].kind === 'fx') tvSynthPath(c.id).then(function (path) { if (tvUp()) tvSend({ t: 'sync', pre: [{ path: path }] }); }, function () { /* toca aqui se precisar */ }); });
+  }
   function tvSpMsg() { const t = spStore.get(); return t && t.access && /\bstreaming\b/.test(t.scope || '') && Date.now() < t.exp ? { tok: t.access, exp: t.exp } : null; }
   function tvSpTok() { if (!tvUp()) return; const m = tvSpMsg(); if (m) tvSend({ t: 'sptok', tok: m.tok, exp: m.exp }); }
   function tvSig() { return A.id + '|' + A.cur + '|' + S.cues.map(function (c) { return c.path || ''; }).join(','); }
@@ -3298,6 +3334,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       pre: S.cues.filter(function (c) { return tvCueOk(c) && c.kind !== 'amb'; }).map(function (c) { return { path: c.path }; }),
       sp: tvSpMsg()
     });
+    if (tvSound()) tvSynthPrep();
   }
   /* quando o som passa para a TV (ou volta), os ambientes que estavam tocando mudam de aparelho sem parar a cena */
   function tvTake() {
