@@ -1174,7 +1174,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.81';
+  const APP_VER = '0.82';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -2237,7 +2237,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       const rows = await r.json();
       if (!campHere() || CAMP.id !== cid || !Array.isArray(rows)) return;
       pingSent = true; pingOff = 0; PARTY = rows;
-      paintFrames();
+      paintFrames(); tvPartyPush();
     } catch (e) { /* sem rede: tenta no próximo ciclo */ }
     finally { pingBusy = false; if (pingMore) { pingMore = false; mPing(); } }
   }
@@ -2306,6 +2306,21 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     const h = framesHtml();
     if (el._h === h) return;
     el._h = h; el.innerHTML = h;
+  }
+  /* tela da mesa: as placas dos jogadores na tela de espera */
+  let tvPartySig = '';
+  function tvPartyList() {
+    if (!campHere()) return [];
+    return frameRows().slice(0, 8).map(function (p) {
+      const i = p.info && typeof p.info === 'object' ? p.info : {}, c = typeof i.c === 'string' ? i.c.trim().slice(0, 40) : '', k = typeof i.k === 'string' ? i.k.slice(0, 40) : '';
+      return { n: c || p.name, s: c ? p.name + (k ? ' · ' + k : '') : k, p: typeof i.p === 'string' && PHOTO_RE.test(i.p) ? i.p : '' };
+    });
+  }
+  function tvPartyPush() {
+    if (typeof tvUp !== 'function' || !tvUp()) return;
+    const l = tvPartyList(), sg = JSON.stringify(l);
+    if (sg === tvPartySig) return; tvPartySig = sg;
+    tvSend({ t: 'party', list: l });
   }
   function partyBarHtml() {
     if (!sbUser()) return '';
@@ -3332,7 +3347,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       t: 'sync', vol: posToGain(S.vol, 1.5), talk: !!talking, view: TVC.view, adv: A.id, name: A.name, show: tvShow(),
       ambs: Object.keys(active).filter(function (id) { return active[id].remote; }).map(function (id) { const c = findCue(id); return c && tvCueOk(c) ? { id: id, path: c.path, level: tvGain(c) } : null; }).filter(Boolean),
       pre: S.cues.filter(function (c) { return tvCueOk(c) && c.kind !== 'amb'; }).map(function (c) { return { path: c.path }; }),
-      sp: tvSpMsg(), mv: TVC.follow ? TVC.mv : null
+      sp: tvSpMsg(), mv: TVC.follow ? TVC.mv : null, party: (function () { const l = tvPartyList(); tvPartySig = JSON.stringify(l); return l; })()
     });
     if (tvSound()) tvSynthPrep();
   }

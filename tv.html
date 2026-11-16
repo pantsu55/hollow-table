@@ -54,6 +54,21 @@ button { cursor: pointer; }
 .idle-in img { width: 20vmin; height: 20vmin; border-radius: 4.4vmin; box-shadow: 0 0 12vmin -3vmin rgba(139, 123, 255, 0.7); }
 .idle-in h1 { margin: 0; font: 600 6.4vmin/1.15 var(--display); letter-spacing: 0.06em; text-wrap: balance; max-width: 22ch; }
 .idle-in p { margin: 0; font: 500 2.3vmin var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+.party { display: none; }
+#idle.has-party { grid-template-rows: auto 1fr; place-items: stretch; }
+#idle.has-party .idle-in { grid-auto-flow: column; justify-content: center; align-items: center; gap: 2vmin; padding: calc(var(--safe) + 1vmin) var(--safe) 0; animation: none; }
+#idle.has-party .idle-in img { width: 6vmin; height: 6vmin; border-radius: 1.4vmin; box-shadow: 0 0 5vmin -1.5vmin rgba(139, 123, 255, 0.7); }
+#idle.has-party .idle-in h1 { font-size: 4vmin; max-width: none; }
+#idle.has-party .idle-in p { display: none; }
+#idle.has-party .party { display: flex; justify-content: center; align-items: center; gap: min(2.4vw, 3.4vmin); padding: 3vmin max(var(--safe), 4vw) calc(var(--safe) + 5vmin); min-height: 0; animation: drift 90s ease-in-out infinite alternate; }
+.pc { position: relative; flex: 0 1 var(--pw, 22vw); aspect-ratio: 3 / 4; max-height: 100%; min-width: 0; border-radius: 2.2vmin; overflow: hidden; background: linear-gradient(160deg, #241f44, #100e1f 70%); border: 0.25vmin solid rgba(139, 123, 255, 0.45); box-shadow: 0 3vmin 8vmin -3vmin rgba(0, 0, 0, 0.9), 0 0 9vmin -4vmin rgba(139, 123, 255, 0.7); }
+.pc img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; opacity: 0; transition: opacity 0.6s; }
+.pc img.ok { opacity: 1; }
+.pc .pc-i { position: absolute; inset: 0 0 22% 0; display: grid; place-items: center; font: 600 min(11vmin, calc(var(--pw, 22vw) * 0.42)) var(--display); color: rgba(139, 123, 255, 0.55); letter-spacing: 0.04em; }
+.pc .pc-t { position: absolute; left: 0; right: 0; bottom: 0; padding: 7vmin 1.6vmin 1.8vmin; text-align: center; background: linear-gradient(transparent, rgba(6, 5, 14, 0.82) 45%, rgba(6, 5, 14, 0.96)); }
+.pc .pc-n { display: block; font: 600 min(3.3vmin, calc(var(--pw, 22vw) * 0.13)) / 1.15 var(--display); letter-spacing: 0.05em; text-wrap: balance; overflow-wrap: anywhere; }
+.pc .pc-s { display: block; margin-top: 0.7vmin; font: 500 min(1.7vmin, calc(var(--pw, 22vw) * 0.07)) var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { #idle.has-party .party { animation: none; } }
 @keyframes drift { from { transform: translate(-1.5vmin, -1vmin); } to { transform: translate(1.5vmin, 1vmin); } }
 @media (prefers-reduced-motion: reduce) { .idle-in { animation: none; } }
 #img { display: grid; place-items: center; background: var(--bg); }
@@ -98,7 +113,7 @@ button { cursor: pointer; }
   </div>
 </div>
 
-<div class="layer on" id="idle"><div class="idle-in"><img src="icon.svg" alt=""><h1 id="idle-name">Hollow Table</h1><p id="idle-sub">Tela da mesa</p></div></div>
+<div class="layer on" id="idle"><div class="idle-in"><img src="icon.svg" alt=""><h1 id="idle-name">Hollow Table</h1><p id="idle-sub">Tela da mesa</p></div><div class="party" id="party"></div></div>
 <figure class="layer" id="img" style="margin:0"><img id="img-el" alt=""><figcaption id="img-cap" hidden></figcaption></figure>
 <div class="layer" id="map"></div>
 
@@ -110,7 +125,7 @@ button { cursor: pointer; }
 (function () {
   'use strict';
   const SBC = { url: 'https://ksucnjrmcagzepxahync.supabase.co', key: 'sb_publishable_zg_rPvJ15I_wbaFZ2qemeg_Xnsalgsh' };
-  const VER = '4';
+  const VER = '5';
   const $ = function (s) { return document.querySelector(s); };
   const lsGet = function (k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
   const lsSet = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ } };
@@ -383,6 +398,28 @@ button { cursor: pointer; }
     ['idle', 'img', 'map'].forEach(function (k) { $('#' + k).classList.toggle('on', k === want); });
     $('#idle-name').textContent = ST.name || 'Hollow Table';
   }
+  /* tela de espera: uma placa por jogador, com o retrato do personagem */
+  const PURL = {}, PPATH = /^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[\w.-]{1,80}$/i;
+  let partySig = '';
+  function hesc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function setParty(list) {
+    list = (Array.isArray(list) ? list : []).slice(0, 8).map(function (p) { p = p || {}; return { n: String(p.n || '').slice(0, 40), s: String(p.s || '').slice(0, 60), p: typeof p.p === "string" && PPATH.test(p.p) ? p.p : '' }; }).filter(function (p) { return p.n; });
+    const sig = JSON.stringify(list); if (sig === partySig) return; partySig = sig;
+    const box = $('#party'), n = list.length;
+    $('#idle').classList.toggle('has-party', n > 0);
+    box.style.setProperty('--pw', Math.min(22, (92 - (n - 1) * 2.4) / Math.max(1, n)).toFixed(2) + 'vw');
+    box.innerHTML = list.map(function (p) {
+      const ini = p.n.trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase();
+      return '<div class="pc"><span class="pc-i">' + hesc(ini) + '</span>' + (p.p ? '<img alt="" data-p="' + hesc(p.p) + '">' : '') + '<div class="pc-t"><span class="pc-n">' + hesc(p.n) + '</span>' + (p.s ? '<span class="pc-s">' + hesc(p.s) + '</span>' : '') + '</div></div>';
+    }).join('');
+    [].forEach.call(box.querySelectorAll('img[data-p]'), function (im) {
+      const p = im.getAttribute('data-p');
+      im.onload = function () { im.classList.add('ok'); };
+      if (PURL[p]) { im.src = PURL[p]; return; }
+      api('/storage/v1/object/authenticated/players/' + p).then(function (r) { if (!r.ok) throw new Error('x'); return r.blob(); })
+        .then(function (b) { PURL[p] = URL.createObjectURL(b); const cur = box.querySelector('img[data-p="' + p + '"]'); if (cur) cur.src = PURL[p]; }).catch(function () { /* fica a inicial */ });
+    });
+  }
   async function showImage(sh) {
     if (!sh || !sh.path) { ST.show = null; imgFor = ''; layers(); return; }
     if (imgFor === sh.path) { if (ST.show) { ST.show.caption = sh.caption || ''; cap(); } return; }
@@ -463,6 +500,7 @@ button { cursor: pointer; }
     if (typeof m.name === 'string') ST.name = m.name;
     if (typeof m.adv === 'string') { ST.adv = m.adv; mapFrame(); }
     if ('show' in m) showImage(m.show);
+    if (Array.isArray(m.party)) setParty(m.party);
     if ('mv' in m) { ST.mv = m.mv || null; mapPost({ ht: 'tvview', m: ST.mv }); }
     if (Array.isArray(m.ambs)) {
       const keep = {};
@@ -487,6 +525,7 @@ button { cursor: pointer; }
     else if (m.t === 'talk') applySync({ talk: !!m.on });
     else if (m.t === 'show') showImage(m.path ? { path: m.path, caption: m.caption } : null);
     else if (m.t === 'view') { ST.view = m.v || 'auto'; layers(); }
+    else if (m.t === 'party') setParty(m.list);
     else if (m.t === 'mv') { ST.mv = m.m || null; mapPost({ ht: 'tvview', m: ST.mv }); }
     else if (m.t === 'mpk') mapPost({ ht: 'tvpoke', k: m.k });
     else if (m.t === 'mpt') mapPost({ ht: 'tvpt', m: m.m || null });
