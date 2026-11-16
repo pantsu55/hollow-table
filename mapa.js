@@ -266,26 +266,29 @@
     var s = document.createElement('style'); s.id = 'mp-css'; s.textContent = CSS; document.head.appendChild(s);
   }
 
-  /* ---------- sons do mapa: curtos e baixos, feitos na hora (sem arquivos) ---------- */
-  var NZ = null;
-  function nzBuf(ac) { if (NZ && NZ.ac === ac) return NZ.b; var b = ac.createBuffer(1, ac.sampleRate, ac.sampleRate), d = b.getChannelData(0); for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; NZ = { ac: ac, b: b }; return b; }
-  function sTone(ac, out, t, f, type, peak, dur, f2, att) { var o = ac.createOscillator(), g = ac.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + (att || 0.008)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.05); }
-  function sNoise(ac, out, t, dur, peak, type, f0, f1, q, att) { var s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain(); s.buffer = nzBuf(ac); s.loop = true; f.type = type; f.Q.value = q || 0.8; f.frequency.setValueAtTime(f0, t); if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + (att || 0.012)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(f); f.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05); }
-  /* um eco curto e abafado dá "sala" às notas sem pesar */
-  function sRoom(ac, out) { if (out._htRoom && out._htRoom.context === ac) return out._htRoom; var inp = ac.createGain(), d = ac.createDelay(0.5), fb = ac.createGain(), lp = ac.createBiquadFilter(), wet = ac.createGain(); d.delayTime.value = 0.13; fb.gain.value = 0.3; lp.type = 'lowpass'; lp.frequency.value = 2200; wet.gain.value = 0.32; inp.connect(out); inp.connect(d); d.connect(lp); lp.connect(fb); fb.connect(d); lp.connect(wet); wet.connect(out); out._htRoom = inp; return inp; }
-  var SFX = {
-    ping: function (ac, o, t) { var r = sRoom(ac, o); sTone(ac, r, t, 1174.66, 'sine', 0.085, 0.5); sTone(ac, r, t + 0.085, 1760, 'sine', 0.07, 0.7); sTone(ac, r, t, 587.33, 'triangle', 0.02, 0.35); },
-    move: function (ac, o, t) { sTone(ac, o, t, 185, 'sine', 0.2, 0.1, 105, 0.004); sNoise(ac, o, t, 0.045, 0.06, 'bandpass', 1500, 0, 1.4, 0.003); },
-    place: function (ac, o, t) { sTone(ac, o, t, 230, 'sine', 0.17, 0.11, 130, 0.004); sNoise(ac, o, t, 0.05, 0.05, 'bandpass', 2100, 0, 1.4, 0.003); },
-    draw: function (ac, o, t) { sNoise(ac, o, t, 0.24, 0.045, 'bandpass', 2400, 4300, 0.9, 0.04); },
-    erase: function (ac, o, t) { sNoise(ac, o, t, 0.2, 0.04, 'bandpass', 3200, 900, 0.9, 0.02); },
-    turn: function (ac, o, t) { var r = sRoom(ac, o); sTone(ac, r, t, 523.25, 'triangle', 0.075, 0.55); sTone(ac, r, t + 0.075, 783.99, 'triangle', 0.06, 0.8); },
-    round: function (ac, o, t) { var r = sRoom(ac, o); [523.25, 659.25, 783.99, 1046.5].forEach(function (f, i) { sTone(ac, r, t + i * 0.07, f, 'triangle', 0.06, 0.7 + i * 0.1); }); sTone(ac, o, t, 130.81, 'sine', 0.06, 0.9, 0, 0.03); },
-    fight: function (ac, o, t) { var r = sRoom(ac, o); sTone(ac, o, t, 112, 'sine', 0.3, 0.5, 52, 0.005); sNoise(ac, o, t, 0.22, 0.07, 'lowpass', 320, 0, 0.7, 0.004); sTone(ac, r, t + 0.2, 293.66, 'triangle', 0.055, 1.2, 0, 0.02); sTone(ac, r, t + 0.2, 440, 'triangle', 0.045, 1.2, 0, 0.02); },
-    end: function (ac, o, t) { var r = sRoom(ac, o); sTone(ac, r, t, 783.99, 'triangle', 0.06, 0.7); sTone(ac, r, t + 0.14, 523.25, 'triangle', 0.065, 1.1); },
-    reveal: function (ac, o, t) { sNoise(ac, o, t, 0.75, 0.05, 'lowpass', 380, 3400, 0.6, 0.28); sTone(ac, sRoom(ac, o), t + 0.28, 1567.98, 'sine', 0.025, 0.7); },
-    down: function (ac, o, t) { sTone(ac, o, t, 165, 'sine', 0.2, 0.38, 62, 0.006); sNoise(ac, o, t, 0.12, 0.04, 'lowpass', 500, 0, 0.7, 0.004); }
-  };
+  /* ---------- sons do mapa: gravações curtas (pasta sons/, todas em domínio público; ver sons/CREDITOS.txt) ----------
+     Cada som tem variações, sorteadas a cada vez, para não soar repetido. [quantas variações, volume] */
+  var SMP = { ping: [3, 0.5], move: [5, 0.62], place: [2, 0.55], draw: [4, 0.85], erase: [2, 0.5], turn: [3, 0.8], round: [1, 0.6], fight: [1, 0.5], end: [1, 0.6], reveal: [2, 0.4], down: [2, 0.6] };
+  var sCtx = null, sCache = {}, sLast = {};
+  function sBuf(ac, key) {
+    if (sCtx !== ac) { sCtx = ac; sCache = {}; }
+    if (sCache[key]) return sCache[key];
+    return (sCache[key] = fetch('sons/' + key + '.mp3?v=1').then(function (r) { if (!r.ok) throw new Error('som'); return r.arrayBuffer(); })
+      .then(function (ab) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(ab, res, rej); if (p && p.catch) p.catch(function () { /* o erro já chega pelo rej */ }); }); })
+      .then(function (b) { sCache[key] = b; return b; })
+      .catch(function () { delete sCache[key]; return null; }));
+  }
+  function sWarm(ac) { Object.keys(SMP).forEach(function (n) { for (var i = 1; i <= SMP[n][0]; i++) sBuf(ac, n + i); }); }
+  function sPlay(ac, out, t, name) {
+    var m = SMP[name], i = 1 + Math.floor(Math.random() * m[0]);
+    if (m[0] > 1 && i === sLast[name]) i = 1 + (i % m[0]);
+    sLast[name] = i;
+    var b = sBuf(ac, name + i), t0 = Date.now();
+    function go(buf, late) { if (!buf) return; var s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf; s.playbackRate.value = 0.96 + Math.random() * 0.08; g.gain.value = m[1]; s.connect(g); g.connect(out); s.start(late ? 0 : t); }
+    if (b && typeof b.then === 'function') b.then(function (buf) { if (Date.now() - t0 < 450) go(buf, true); }); else go(b, false);
+  }
+  var SFX = {};
+  Object.keys(SMP).forEach(function (n) { SFX[n] = function (ac, o, t) { sPlay(ac, o, t, n); }; });
 
   function mount(host, ctx) {
     injectCss();
@@ -320,13 +323,17 @@
         if (ctx.sndMute && ctx.sndMute()) return;
         var now = Date.now(); if (sndAt[name] && now - sndAt[name] < 110) return; sndAt[name] = now;
         var io = sndIo(); if (!io) return;
+        if (sndWarm !== io.ac) { sndWarm = io.ac; sWarm(io.ac); }
         if (io.ac.state !== 'running') { if (io.ac.resume) io.ac.resume().catch(function () { /* espera um toque */ }); return; }
         SFX[name](io.ac, io.out, io.ac.currentTime + 0.02);
         if (ctx.onSnd) ctx.onSnd(name);
       } catch (e) { /* som é um extra */ }
     }
-    function sndUnlock() { if (ctx.audio || !sndOn) return; var io = sndIo(); if (io && io.ac.state === 'suspended') io.ac.resume().catch(function () { /* ok */ }); }
+    var sndWarm = null;
+    function sndPre() { if (!sndOn) return; var io = sndIo(); if (io && sndWarm !== io.ac) { sndWarm = io.ac; sWarm(io.ac); } }
+    function sndUnlock() { if (!sndOn) return; if (!ctx.audio) { var io = sndIo(); if (io && io.ac.state === 'suspended') io.ac.resume().catch(function () { /* ok */ }); } sndPre(); }
     document.addEventListener('pointerdown', sndUnlock, true);
+    if (ctx.audio) setTimeout(function () { if (!dead) sndPre(); }, 2500);
     host.innerHTML = '<div class="mp' + (ctx.full ? ' full' : '') + (ctx.fill ? ' fill' : '') + (spect ? ' mp-tv' : '') + '"><svg class="mp-svg" xmlns="http://www.w3.org/2000/svg"><defs class="mp-defs"></defs><g class="mp-w"><g class="L-img"></g><g class="L-grid"></g><g class="L-obj"></g><g class="L-fog"></g><g class="L-tok"></g><g class="L-hl"></g><g class="L-rul"></g><g class="L-ping"></g></g></svg>' +
       '<div class="mp-tl"></div><div class="mp-tr"></div><div class="mp-sub" hidden></div><div class="mp-banner" hidden></div><div class="mp-read" hidden></div><div class="mp-insp" hidden></div><div class="mp-empty" hidden></div>' +
       (owner && !ctx.toolsEl ? '<aside class="mp-side" hidden aria-label="Ferramentas do mapa"></aside>' : '') + '</div>';
