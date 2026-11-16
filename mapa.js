@@ -268,12 +268,12 @@
 
   /* ---------- sons do mapa: gravações curtas (pasta sons/, todas em domínio público; ver sons/CREDITOS.txt) ----------
      Cada som tem variações, sorteadas a cada vez, para não soar repetido. [quantas variações, volume] */
-  var SMP = { ping: [1, 0.55], move: [5, 0.7], place: [2, 0.55], draw: [4, 0.85], erase: [2, 0.5], turn: [3, 0.8], round: [1, 0.6], fight: [1, 0.7], end: [1, 0.5], down: [1, 0.6] };
+  var SMP = { ping: [1, 0.55], move: [5, 0.7], place: [2, 0.55], draw: [4, 0.85], erase: [2, 0.5], turn: [3, 0.8], round: [1, 0.6], fight: [1, 0.7], end: [1, 0.5], reveal: [1, 0.6], down: [1, 0.6] };
   var sCtx = null, sCache = {}, sLast = {};
   function sBuf(ac, key) {
     if (sCtx !== ac) { sCtx = ac; sCache = {}; }
     if (sCache[key]) return sCache[key];
-    return (sCache[key] = fetch('sons/' + key + '.mp3?v=3').then(function (r) { if (!r.ok) throw new Error('som'); return r.arrayBuffer(); })
+    return (sCache[key] = fetch('sons/' + key + '.mp3?v=4').then(function (r) { if (!r.ok) throw new Error('som'); return r.arrayBuffer(); })
       .then(function (ab) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(ab, res, rej); if (p && p.catch) p.catch(function () { /* o erro já chega pelo rej */ }); }); })
       .then(function (b) { sCache[key] = b; return b; })
       .catch(function () { delete sCache[key]; return null; }));

@@ -1,4 +1,5 @@
-Sons do mapa (Hollow Table). Todos em domínio público (Creative Commons Zero, CC0 1.0).
+Sons do mapa (Hollow Table). Todos em domínio público (Creative Commons Zero, CC0 1.0),
+com exceção do reveal1, que segue a licença de conteúdo do Pixabay.
 Foram recortados, nivelados, às vezes combinados, e convertidos para MP3.
 
 Kenney (www.kenney.nl), CC0:
@@ -12,3 +13,6 @@ Sam Gossner e o projeto VCSL (Versilian Community Sample Library, github.com/sgo
 
 Anthousai, "writing - pencil - wide 01" (freesound.org/people/Anthousai/sounds/337085), CC0:
   draw1-4 (lápis no papel)
+
+soumages, "Wind Sound" (Pixabay, nº 379042), licença de conteúdo do Pixabay, enviado pelo Mestre:
+  reveal1 (brisa, trecho inicial de 2 segundos)
