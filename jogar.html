@@ -559,7 +559,7 @@ main.wide { max-width: none; }
 </head>
 <body>
 <main id="app"></main>
-<script src="mapa.js?v=0.74"></script>
+<script src="mapa.js?v=0.77"></script>
 <div class="dlg" id="dlg" hidden role="dialog" aria-modal="true"></div>
 <script>
 (function () {
@@ -582,6 +582,14 @@ main.wide { max-width: none; }
     const pick = typeof e.data.uid === 'string' && UIDRE.test(e.data.uid) ? e.data.uid : '';
     if (pick) { shView = pick; embPick = pick; }
     if (cur && (tab !== embTab || pick)) { tab = embTab; drawLobby(); }
+  });
+  /* tela da mesa: o app do Mestre manda o enquadramento, o ponteiro e o aviso de que algo mudou */
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || !EMBED_TV || !mapCtl) return;
+    const d = e.data;
+    if (d.ht === 'tvview') mapCtl.focus(d.m || null);
+    else if (d.ht === 'tvpoke') mapCtl.poke(d.k);
+    else if (d.ht === 'tvpt') mapCtl.pointer(d.m || null);
   });
   /* quadro clicado no app do Mestre: abre a ficha (ou a mochila) daquele jogador */
   let embPick = EMBED && UIDRE.test(QS.get('uid') || '') ? QS.get('uid') : '';
@@ -776,6 +784,8 @@ main.wide { max-width: none; }
       api: api, cid: cur.id, uid: me().id, owner: isOwner() && !EMBED_TV, spect: EMBED_TV, system: cur.system, full: EMBED_MAP, fill: !EMBED_MAP,
       onShown: EMBED_TV ? function (on, name) { try { parent.postMessage({ ht: 'tvmap', on: !!on, name: name || '' }, location.origin); } catch (e) { /* ok */ } } : null,
       imgUrl: imgUrl,
+      /* na tela da mesa os sons do mapa saem pelo som da própria TV (já destravado pelo botão dela) */
+      audio: EMBED_TV ? function () { try { const t = parent.HTTV, c = t && t.audioOn && t.audioOn() ? t.ctx() : null, o = c && t.fxOut ? t.fxOut() : null; return c && o ? { ac: c, out: o } : null; } catch (e) { return null; } } : null,
       combatEl: $('#jg-fight'),
       myName: myName,
       rollInit: cur.system === 'dnd5e' && !isOwner() ? rollInit : null,
@@ -1472,7 +1482,7 @@ main.wide { max-width: none; }
     return '<div class="card idc">' + photoBox() + '<div class="idf"><div class="field"><label>Nome do personagem</label><input class="nm" data-k="@name" value="' + esc(SH.name || '') + '" placeholder="Sem nome"' + dis() + '></div><div class="row">' + idf + '</div></div>' + crb + cpb + '</div>';
   }
   /* assistente de criação (D&D 5e): carrega os dados só quando precisa */
-  const CR_VER = '0.76';
+  const CR_VER = '0.77';
   const IK_CR = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-4px;margin-right:6px"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
   let crLoading = null;
   function crScript(src) { return new Promise(function (res, rej) { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = rej; document.head.appendChild(el); }); }

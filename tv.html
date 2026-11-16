@@ -110,7 +110,7 @@ button { cursor: pointer; }
 (function () {
   'use strict';
   const SBC = { url: 'https://ksucnjrmcagzepxahync.supabase.co', key: 'sb_publishable_zg_rPvJ15I_wbaFZ2qemeg_Xnsalgsh' };
-  const VER = '3';
+  const VER = '4';
   const $ = function (s) { return document.querySelector(s); };
   const lsGet = function (k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
   const lsSet = function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sem armazenamento */ } };
@@ -406,9 +406,11 @@ button { cursor: pointer; }
     box.innerHTML = ST.adv ? '<iframe title="Mapa da mesa" src="jogar.html?embed=mapa&amp;tv=1&amp;adv=' + encodeURIComponent(ST.adv) + '"></iframe>' : '';
     layers();
   }
+  function mapPost(o) { const f = document.querySelector('#map iframe'); try { if (f && f.contentWindow) f.contentWindow.postMessage(o, location.origin); } catch (e) { /* ok */ } }
   window.addEventListener('message', function (e) {
     if (e.origin !== location.origin || !e.data || e.data.ht !== 'tvmap') return;
     ST.mapOn = !!e.data.on; ST.mapName = e.data.name || ''; layers(); hello();
+    if (ST.mapOn) mapPost({ ht: 'tvview', m: ST.mv || null });
   });
 
   /* ---------- Spotify dentro da página (se o navegador da TV deixar) ---------- */
@@ -461,6 +463,7 @@ button { cursor: pointer; }
     if (typeof m.name === 'string') ST.name = m.name;
     if (typeof m.adv === 'string') { ST.adv = m.adv; mapFrame(); }
     if ('show' in m) showImage(m.show);
+    if ('mv' in m) { ST.mv = m.mv || null; mapPost({ ht: 'tvview', m: ST.mv }); }
     if (Array.isArray(m.ambs)) {
       const keep = {};
       m.ambs.forEach(function (a) { keep[a.id] = 1; ambOn(a.id, a.path, a.level); });
@@ -484,6 +487,9 @@ button { cursor: pointer; }
     else if (m.t === 'talk') applySync({ talk: !!m.on });
     else if (m.t === 'show') showImage(m.path ? { path: m.path, caption: m.caption } : null);
     else if (m.t === 'view') { ST.view = m.v || 'auto'; layers(); }
+    else if (m.t === 'mv') { ST.mv = m.m || null; mapPost({ ht: 'tvview', m: ST.mv }); }
+    else if (m.t === 'mpk') mapPost({ ht: 'tvpoke', k: m.k });
+    else if (m.t === 'mpt') mapPost({ ht: 'tvpt', m: m.m || null });
     else if (m.t === 'sptok') spToken(m);
     else if (m.t === 'who') hello();
     else if (m.t === 'test') soundTest(m.how === 'el' ? 'el' : 'wa');
@@ -527,7 +533,7 @@ button { cursor: pointer; }
     clearTimeout(curT); curT = setTimeout(function () { document.body.classList.add('idle-cursor'); }, 5000);
   }
   ['mousemove', 'keydown', 'pointerdown'].forEach(function (ev) { document.addEventListener(ev, poke, { passive: true }); });
-  window.HTTV = { state: ST, sp: SPT, ambs: ambs, audioOn: audioOn, mp3File: mp3File, ambOn: ambOn, ambOff: ambOff, ctx: function () { return ctx; } };
+  window.HTTV = { state: ST, sp: SPT, ambs: ambs, audioOn: audioOn, mp3File: mp3File, ambOn: ambOn, ambOff: ambOff, ctx: function () { return ctx; }, fxOut: function () { return fxBus; } };
   boot();
 })();
 </script>

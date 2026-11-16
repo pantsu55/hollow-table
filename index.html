@@ -1153,7 +1153,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <footer class="dock" id="dock" hidden></footer>
 
-<script src="mapa.js?v=0.74"></script>
+<script src="mapa.js?v=0.77"></script>
 <script src="canal.js?v=1"></script>
 <script>
 (function () {
@@ -1174,7 +1174,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     }).join('');
   }
   /* ---------- ícones (traço simples, herdam a cor do texto) ---------- */
-  const APP_VER = '0.76';
+  const APP_VER = '0.77';
   const RAVEN = '<svg viewBox="96 180 344 220" aria-hidden="true"><path d="M40 392 C140 336 372 336 472 392" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" opacity=".55"/><path fill="currentColor" d="M112 252 C132 242 152 234 166 232 C170 210 196 196 224 200 C256 206 292 232 330 262 L424 322 L388 332 L422 356 L364 356 C332 372 292 360 262 338 C238 322 212 304 202 282 C194 270 178 264 164 266 C146 262 126 256 112 252 Z"/></svg>';
   const SV = function (p, extra) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"' + (extra || '') + '>' + p + '</svg>'; };
   const ICO = {
@@ -3275,7 +3275,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
      A TV abre tv.html com a mesma conta. Os dois aparelhos conversam por um canal privado (canal.js):
      o app manda o que tocar e o que mostrar; a TV avisa a cada 15 s que está ligada. Só arquivos da nuvem
      tocam na TV; os sons sintetizados da aventura de exemplo continuam saindo deste aparelho. */
-  var TVC = { ch: null, seen: 0, info: null, sound: lsGet('ht-tv-som', true) !== false, view: 'auto', sig: '', volT: 0, lost: false };
+  var TVC = { ch: null, seen: 0, info: null, sound: lsGet('ht-tv-som', true) !== false, follow: lsGet('ht-tv-segue', true) !== false, mv: null, view: 'auto', sig: '', volT: 0, lost: false };
   var tvDlg = false;
   function tvUp() { return !!(TVC && TVC.ch && TVC.ch.on && TVC.info && Date.now() - TVC.seen < 50000); }
   function tvSound() { return tvUp() && TVC.sound && !!TVC.info.audio; }
@@ -3332,7 +3332,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
       t: 'sync', vol: posToGain(S.vol, 1.5), talk: !!talking, view: TVC.view, adv: A.id, name: A.name, show: tvShow(),
       ambs: Object.keys(active).filter(function (id) { return active[id].remote; }).map(function (id) { const c = findCue(id); return c && tvCueOk(c) ? { id: id, path: c.path, level: tvGain(c) } : null; }).filter(Boolean),
       pre: S.cues.filter(function (c) { return tvCueOk(c) && c.kind !== 'amb'; }).map(function (c) { return { path: c.path }; }),
-      sp: tvSpMsg()
+      sp: tvSpMsg(), mv: TVC.follow ? TVC.mv : null
     });
     if (tvSound()) tvSynthPrep();
   }
@@ -3409,6 +3409,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
         '<div class="tv-row"><div><b>Som na TV</b><span class="hint-s">Efeitos e ambientes da nuvem tocam na TV em vez deste aparelho.</span></div><button type="button" class="btn tgl" data-action="tvSound" aria-pressed="' + !!TVC.sound + '">' + (TVC.sound ? 'Ligado' : 'Desligado') + '</button></div>' +
         '<div class="tv-row"><div><b>O que aparece</b><span class="hint-s">' + (TVC.view === 'idle' ? 'Só a tela de descanso.' : TVC.view === 'nomap' ? 'Imagens reveladas; o mapa fica escondido.' : 'A imagem revelada; sem imagem, o mapa' + (i.map ? ' (no ar agora).' : ', quando você mostrar um.')) + '</span></div>' +
         '<div class="seg" role="radiogroup" aria-label="O que aparece na TV">' + [['auto', 'Tudo'], ['nomap', 'Sem mapa'], ['idle', 'Descanso']].map(function (o) { return '<button type="button" role="radio" aria-checked="' + (TVC.view === o[0]) + '" data-action="tvView" data-id="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div></div>';
+      h += '<div class="tv-row"><div><b>Acompanhar o meu zoom</b><span class="hint-s">Quando você aproxima ou move o mapa aqui, a TV enquadra o mesmo trecho. Desligado, a TV mostra o mapa inteiro.</span></div><button type="button" class="btn tgl" data-action="tvFollow" aria-pressed="' + !!TVC.follow + '">' + (TVC.follow ? 'Ligado' : 'Desligado') + '</button></div>';
       const dg = i.dg || null, tt = TVC.test;
       const dgTxt = dg ? 'Efeitos tocados: ' + dg.fx + (dg.fxEl ? ' (' + dg.fxEl + ' pelo modo reserva)' : '') + (dg.fxErr ? ', ' + dg.fxErr + ' com falha' : '') + ' · Ambientes no ar: ' + dg.ambOn + (dg.ambErr ? ', ' + dg.ambErr + ' com falha' : '') + (dg.err ? ' · Último erro: ' + dg.err : '') : 'Esta TV está com a página antiga. Recarregue a página na TV.';
       const ttTxt = !tt ? 'Toque num teste e escute a TV: devem soar duas notas curtas.' : (tt.wait ? 'Tocando o teste na TV…' : (tt.ok ? 'A TV disse que tocou o teste de ' + (tt.how === 'el' ? 'ambientes' : 'efeitos') + '. Se você não ouviu nada, me avise: o som está sendo bloqueado pela TV.' : 'O teste de ' + (tt.how === 'el' ? 'ambientes' : 'efeitos') + ' falhou na TV: ' + esc(tt.err || 'sem detalhe') + '.'));
@@ -3750,6 +3751,12 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     JOGO.ctl = window.HTMap.mount(JOGO.el, {
       api: sbReq, cid: CAMP.id, uid: sbUser().id, owner: true, system: CAMP.system || 'dnd5e', fill: true,
       imgUrl: mapImgUrl, toolsEl: JOGO.tools, combatEl: JOGO.fight,
+      /* tela da mesa: acompanha o enquadramento, recebe o ponteiro e busca as mudanças na hora */
+      onView: function (m) { TVC.mv = m; if (tvUp() && TVC.follow) tvSend({ t: 'mv', m: m }); },
+      onPoke: function (k) { if (tvUp()) tvSend({ t: 'mpk', k: k }); },
+      onPoint: function (m) { if (tvUp()) tvSend({ t: 'mpt', m: m }); },
+      audio: function () { try { ensure(); return ctx && fxBus ? { ac: ctx, out: fxBus } : null; } catch (e) { return null; } },
+      sndMute: function () { return tvSound(); },
       toast: function (t) { toast(t); },
       myName: function () { return 'Mestre'; },
       onLog: function () { evPoll(true); },
@@ -4194,6 +4201,7 @@ body[data-mode="mesa"] .toast { bottom: calc(100px + env(safe-area-inset-bottom,
     if (a === 'tvOpen') { tvDlg = true; tvConnect(); renderTvDlg(); return; }
     if (a === 'tvClose') { tvDlg = false; renderTvDlg(); return; }
     if (a === 'tvSound') { tvSetSound(!TVC.sound); return; }
+    if (a === 'tvFollow') { TVC.follow = !TVC.follow; lsSet('ht-tv-segue', TVC.follow); tvSend({ t: 'mv', m: TVC.follow ? TVC.mv : null }); if (TVC.follow && JOGO.ctl && JOGO.ctl.viewNow) JOGO.ctl.viewNow(); renderTvDlg(); return; }
     if (a === 'tvView') { TVC.view = id || 'auto'; tvSend({ t: 'view', v: TVC.view }); renderTvDlg(); return; }
     if (a === 'tvSpotify') { tvSpotify(); return; }
     if (a === 'tvTest') { TVC.test = { how: id, wait: true, at: Date.now() }; tvSend({ t: 'test', how: id }); renderTvDlg(); setTimeout(function () { if (TVC.test && TVC.test.wait) { TVC.test = { how: id, ok: false, err: 'a TV não respondeu', at: Date.now() }; renderTvDlg(); } }, 6000); return; }
