@@ -2,10 +2,13 @@ Sons do mapa (Hollow Table). Todos em domínio público (Creative Commons Zero, 
 Foram recortados, nivelados e convertidos para MP3.
 
 Kenney (www.kenney.nl), CC0:
-  Casino Audio      ping1-3 (fichas se tocando), round1 (cartas abertas em leque)
-  Impact Sounds     move1-5 e place1-2 (madeira), down1-2 (baque surdo)
-  RPG Audio         turn1-3 (página virando), end1 (livro fechando), erase1-2 (pano)
+  Casino Audio      erase1-2 (carta empurrada), round1 (cartas abertas em leque)
+  Impact Sounds     move1-5 (passos em madeira), place1-2 (madeira), down1-2 (baque surdo)
+  RPG Audio         turn1-3 (página virando), end1 (livro fechando)
   Foley Sounds      fight1 (espada saindo da bainha), reveal1-2 (sopro)
 
 Anthousai, "writing - pencil - wide 01" (freesound.org/people/Anthousai/sounds/337085), CC0:
   draw1-4 (lápis no papel)
+
+Sam Gossner e o projeto VCSL (Versilian Community Sample Library), CC0:
+  ping1 (sino de mão nepalês)

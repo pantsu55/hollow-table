@@ -268,27 +268,29 @@
 
   /* ---------- sons do mapa: gravações curtas (pasta sons/, todas em domínio público; ver sons/CREDITOS.txt) ----------
      Cada som tem variações, sorteadas a cada vez, para não soar repetido. [quantas variações, volume] */
-  var SMP = { ping: [3, 0.5], move: [5, 0.62], place: [2, 0.55], draw: [4, 0.85], erase: [2, 0.5], turn: [3, 0.8], round: [1, 0.6], fight: [1, 0.5], end: [1, 0.6], reveal: [2, 0.4], down: [2, 0.6] };
+  var SMP = { ping: [1, 0.55], move: [5, 0.7], place: [2, 0.55], draw: [4, 0.85], erase: [2, 0.5], turn: [3, 0.8], round: [1, 0.6], fight: [1, 0.5], end: [1, 0.6], reveal: [2, 0.4], down: [2, 0.6] };
   var sCtx = null, sCache = {}, sLast = {};
   function sBuf(ac, key) {
     if (sCtx !== ac) { sCtx = ac; sCache = {}; }
     if (sCache[key]) return sCache[key];
-    return (sCache[key] = fetch('sons/' + key + '.mp3?v=1').then(function (r) { if (!r.ok) throw new Error('som'); return r.arrayBuffer(); })
+    return (sCache[key] = fetch('sons/' + key + '.mp3?v=2').then(function (r) { if (!r.ok) throw new Error('som'); return r.arrayBuffer(); })
       .then(function (ab) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(ab, res, rej); if (p && p.catch) p.catch(function () { /* o erro já chega pelo rej */ }); }); })
       .then(function (b) { sCache[key] = b; return b; })
       .catch(function () { delete sCache[key]; return null; }));
   }
   function sWarm(ac) { Object.keys(SMP).forEach(function (n) { for (var i = 1; i <= SMP[n][0]; i++) sBuf(ac, n + i); }); }
-  function sPlay(ac, out, t, name) {
+  function sPlay(ac, out, t, name, n) {
+    /* uma peça que anda várias casas dá vários passos */
+    if (n > 1) { for (var q = 0; q < n; q++) sPlay(ac, out, t + q * 0.17, name, 1); return; }
     var m = SMP[name], i = 1 + Math.floor(Math.random() * m[0]);
     if (m[0] > 1 && i === sLast[name]) i = 1 + (i % m[0]);
     sLast[name] = i;
     var b = sBuf(ac, name + i), t0 = Date.now();
-    function go(buf, late) { if (!buf) return; var s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf; s.playbackRate.value = 0.96 + Math.random() * 0.08; g.gain.value = m[1]; s.connect(g); g.connect(out); s.start(late ? 0 : t); }
-    if (b && typeof b.then === 'function') b.then(function (buf) { if (Date.now() - t0 < 450) go(buf, true); }); else go(b, false);
+    function go(buf, late) { if (!buf) return; var s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf; s.playbackRate.value = name === 'ping' ? 1 : 0.96 + Math.random() * 0.08; g.gain.value = m[1]; s.connect(g); g.connect(out); s.start(late ? Math.max(ac.currentTime, t) : t); }
+    if (b && typeof b.then === 'function') b.then(function (buf) { if (Date.now() - t0 < 450 || t > ac.currentTime) go(buf, true); }); else go(b, false);
   }
   var SFX = {};
-  Object.keys(SMP).forEach(function (n) { SFX[n] = function (ac, o, t) { sPlay(ac, o, t, n); }; });
+  Object.keys(SMP).forEach(function (n) { SFX[n] = function (ac, o, t, k) { sPlay(ac, o, t, n, k); }; });
 
   function mount(host, ctx) {
     injectCss();
@@ -317,7 +319,7 @@
       if (!sndAc) { try { var AC = window.AudioContext || window.webkitAudioContext; sndAc = new AC(); sndOut = sndAc.createGain(); sndOut.gain.value = 0.8; sndOut.connect(sndAc.destination); } catch (e) { return null; } }
       return { ac: sndAc, out: sndOut };
     }
-    function snd(name) {
+    function snd(name, n) {
       if (!sndOn || dead || document.hidden || !SFX[name]) return;
       try {
         if (ctx.sndMute && ctx.sndMute()) return;
@@ -325,7 +327,7 @@
         var io = sndIo(); if (!io) return;
         if (sndWarm !== io.ac) { sndWarm = io.ac; sWarm(io.ac); }
         if (io.ac.state !== 'running') { if (io.ac.resume) io.ac.resume().catch(function () { /* espera um toque */ }); return; }
-        SFX[name](io.ac, io.out, io.ac.currentTime + 0.02);
+        SFX[name](io.ac, io.out, io.ac.currentTime + 0.02, n);
         if (ctx.onSnd) ctx.onSnd(name);
       } catch (e) { /* som é um extra */ }
     }
@@ -849,11 +851,11 @@
         if (hold) return;
         if (r.gone) { if (old) { delete objs[r.id]; ch = true; ev.erase = 1; if (sel === r.id) sel = null; } return; }
         if (!old) ev[r.kind === 'tok' ? 'place' : 'draw'] = 1;
-        else if (r.kind === 'tok') { var od = old.data || {}, nd = r.data || {}; if (num(od.x, 0) !== num(nd.x, 0) || num(od.y, 0) !== num(nd.y, 0)) ev.move = 1; if (nd.dead && !od.dead) ev.down = 1; }
+        else if (r.kind === 'tok') { var od = old.data || {}, nd = r.data || {}; if (num(od.x, 0) !== num(nd.x, 0) || num(od.y, 0) !== num(nd.y, 0)) ev.move = stepsOf(od, nd); if (nd.dead && !od.dead) ev.down = 1; }
         objs[r.id] = { id: r.id, kind: r.kind, data: r.data || {}, owner: r.owner, hidden: !!r.hidden, gone: false, seq: r.seq, cell: r.cell };
         ch = true;
       });
-      if (!silent && ch && rows.length <= 8) Object.keys(ev).forEach(snd);
+      if (!silent && ch && rows.length <= 8) Object.keys(ev).forEach(function (k) { snd(k, ev[k]); });
       return ch;
     }
     function curMapId() { return owner ? (map && map.id) : (P && P.map_id); }
@@ -1247,7 +1249,7 @@
       var fromCell = from || tokCell(o.data);
       o.data = Object.assign({}, o.data, { x: x, y: y }); busy[o.id] = Date.now() + 2500;
       if (owner) o.cell = cellIdx(o);
-      drawObjs(); if (o.kind === 'tok') snd('move');
+      drawObjs(); if (o.kind === 'tok') snd('move', stepsOf({ x: fromCell[0], y: fromCell[1] }, { x: tokCell(o.data)[0], y: tokCell(o.data)[1] }));
       try {
         await post('/rest/v1/rpc/move_obj', { oid: o.id, nx: x, ny: y, nc: owner ? o.cell : null });
         if (o.kind === 'tok') logMove(o, fromCell, tokCell(o.data));
@@ -1380,6 +1382,7 @@
     /* ---------- combate ---------- */
     function entCol(e) { var o = objs[e.k]; return (o && o.data && o.data.col) || e.c || '#9A95B8'; }
     function iniLabel() { return sys === 'gurps' ? 'Vel. básica' : 'Iniciativa'; }
+    function stepsOf(a, b) { return clamp(Math.round(Math.max(Math.abs(num(b.x, 0) - num(a.x, 0)), Math.abs(num(b.y, 0) - num(a.y, 0)))), 1, 4); }
     function fightSnd(a, b) {
       var ao = !!(a && a.on), bo = !!(b && b.on);
       if (!ao && bo) { snd('fight'); return; }
