@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '2';
+  const VER = '3';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
