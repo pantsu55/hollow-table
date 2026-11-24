@@ -80,7 +80,7 @@
     if (has('presas')) L.push('presas');
     L.push('roupa', 'roupa_pele');                    // *_pele: pele que estava desenhada na camada de cima (troca com a pele)
     const hair = c.elmo ? 'cabelo_elmo' : 'cabelo';
-    L.push(hair, hair + '_pele');
+    L.push(hair, hair + '_pele', hair + '_fixo');   // _fixo: olho, prendedor e pedaços de roupa que estavam no cabelo (não mudam)
     const ears = ex.filter(function (x) { return x.indexOf('orelha_') === 0; });
     if (!c.elmo) ears.forEach(function (x) { L.push(x); });
     if (c.arma !== 'nenhuma') L.push(c.arma, c.arma + '_pele', c.arma + '_cabelo');
