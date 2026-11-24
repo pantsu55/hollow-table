@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '3';
+  const VER = '4';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
@@ -24,12 +24,14 @@
     return { set: c.set, elmo: !!c.elmo, arma: c.arma };
   }
   function loadMan() {
-    if (!manP) manP = fetch(BASE + 'manifest.json?v=' + VER).then(function (r) { return r.json(); }).then(function (m) { man = m; return m; }).catch(function () { manP = null; });
+    if (!manP) manP = fetch(BASE + 'manifest.json?v=' + VER, { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (m) { man = m; return m; }).catch(function () { manP = null; });
     return manP;
   }
   function img(set, layer) {
     const k = set + '/' + layer;
-    if (!imgs[k]) { const im = new Image(); im.src = BASE + k + '.png?v=' + VER; imgs[k] = im; }
+    /* cada camada vem com a impressão digital do conteúdo: arquivo novo = endereço novo, sem misturar com cópias antigas */
+    const h = ((man && man.sets[set] && man.sets[set].hash) || {})[layer] || VER;
+    if (!imgs[k]) { const im = new Image(); im.src = BASE + k + '.png?h=' + h; imgs[k] = im; }
     return imgs[k];
   }
   function layersFor(c) {
