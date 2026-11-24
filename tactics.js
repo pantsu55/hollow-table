@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '5';
+  const VER = '7';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
@@ -46,57 +46,29 @@
     if (!RACAS.some(function (a) { return a[0] === c.raca; })) c.raca = DEF.raca;
     return { set: c.set, raca: c.raca, elmo: !!c.elmo, arma: c.arma, pele: c.pele, cabelo: c.cabelo };
   }
+  const INL = window.HTTAC_INLINE || null;   // página de revisão: manifest e imagens embutidos
   function loadMan() {
+    if (INL && !man) { man = INL.manifest; manP = Promise.resolve(man); }
     if (!manP) manP = fetch(BASE + 'manifest.json?v=' + VER, { cache: 'no-cache' }).then(function (r) { return r.json(); }).then(function (m) { man = m; return m; }).catch(function () { manP = null; });
     return manP;
   }
-  function img(set, layer) {
-    const k = set + '/' + layer;
-    /* cada camada vem com a impressão digital do conteúdo: arquivo novo = endereço novo, sem misturar com cópias antigas */
-    const h = ((man && man.sets[set] && man.sets[set].hash) || {})[layer] || VER;
-    if (!imgs[k]) { const im = new Image(); im.src = BASE + k + '.png?h=' + h; imgs[k] = im; }
+  /* pele e cabelo: as variações vêm prontas do servidor (camada~opção.png), feitas e revisadas antes de publicar */
+  const SKIN_L = { corpo: 1, pele_elmo: 1, orelha_elfo: 1, orelha_orc: 1, orelha_elfo_b: 1, orelha_orc_b: 1 };
+  const HAIR_L = { cabelo: 1, cabelo_elmo: 1 };
+  function img(set, name) {
+    const k = set + '/' + name;
+    if (!imgs[k]) {
+      const h = ((man && man.sets[set] && man.sets[set].hash) || {})[name] || VER;
+      const im = new Image(); im.src = INL ? (INL.files[k] || '') : BASE + k + '.png?h=' + h; imgs[k] = im;
+    }
     return imgs[k];
   }
-  /* troca de cor: a claridade de cada pixel escolhe o tom na paleta nova (mantém sombras e luz do desenho) */
-  function hex(h) { return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
-  function hsl(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
-    if (!d) return [0, 0, l];
-    const s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-    let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : (mx === g ? (b - r) / d + 2 : (r - g) / d + 4);
-    return [h * 60, s, l];
-  }
-  const SRC = { pele: [0.28, 0.80], cabelo: [0.07, 0.46] };
-  function rampAt(R, t) { const x = t * (R.length - 1), i = Math.min(R.length - 2, Math.floor(x)), f = x - i; return [0, 1, 2].map(function (k) { return Math.round(R[i][k] + (R[i + 1][k] - R[i][k]) * f); }); }
-  function recolor(im, kind, ramp) {
-    const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
-    const ctx = cv.getContext('2d'); ctx.drawImage(im, 0, 0);
-    const d = ctx.getImageData(0, 0, cv.width, cv.height), a = d.data, R = ramp.map(hex), lo = SRC[kind][0], hi = SRC[kind][1], memo = {};
-    for (let i = 0; i < a.length; i += 4) {
-      if (!a[i + 3]) continue;
-      const key = (a[i] << 16) | (a[i + 1] << 8) | a[i + 2];
-      let out = memo[key];
-      if (out === undefined) {
-        const q = hsl(a[i], a[i + 1], a[i + 2]);
-        const skin = kind === 'pele' ? ((q[0] <= 45 || q[0] >= 340) && q[1] >= 0.15 && q[2] >= lo && q[2] <= 0.86) : q[2] >= lo;
-        out = memo[key] = skin ? rampAt(R, Math.max(0, Math.min(1, (q[2] - lo) / (hi - lo)))) : null;
-      }
-      if (out) { a[i] = out[0]; a[i + 1] = out[1]; a[i + 2] = out[2]; }
-    }
-    ctx.putImageData(d, 0, 0);
-    return cv;
-  }
-  const tinted = {};
   function layerImg(c, l) {
-    const base = img(c.set, l);
-    const kind = (l === 'corpo' || l.indexOf('orelha_') === 0) ? 'pele' : (l === 'cabelo' || l === 'cabelo_elmo' ? 'cabelo' : null);
-    const opt = kind && (kind === 'pele' ? PELES : CABELOS).filter(function (p) { return p[0] === c[kind]; })[0];
-    if (!opt || !opt[2]) return base;
-    if (!base.complete || !base.naturalWidth) return null;
-    const k = c.set + '/' + l + '/' + opt[0];
-    if (!tinted[k]) tinted[k] = recolor(base, kind, opt[2]);
-    return tinted[k];
+    const hs = (man.sets[c.set] || {}).hash || {};
+    let v = null;
+    if (SKIN_L[l] && c.pele !== 'clara') v = l + '~' + c.pele;
+    if (HAIR_L[l] && c.cabelo !== 'castanho') v = l + '~' + c.cabelo;
+    return img(c.set, v && hs[v] ? v : l);
   }
   function layersFor(c) {
     const have = (man.sets[c.set] || {}).layers || [];
@@ -104,10 +76,12 @@
     const has = function (x) { return ex.indexOf(x) >= 0; };
     const L = ['corpo'];
     if (has('presas')) L.push('presas');
-    L.push('roupa', c.elmo ? 'cabelo_elmo' : 'cabelo');
-    ex.forEach(function (x) { if (x.indexOf('orelha_') === 0) L.push(x); });
+    L.push('roupa');
+    ex.forEach(function (x) { if (x.indexOf('orelha_') === 0) L.push(x + '_b'); });   // de costas: orelha por baixo do cabelo
+    L.push(c.elmo ? 'cabelo_elmo' : 'cabelo');
+    ex.forEach(function (x) { if (x.indexOf('orelha_') === 0) L.push(x); });          // de frente: por cima
     if (c.arma !== 'nenhuma') L.push(c.arma);
-    if (c.elmo) L.push('elmo');
+    if (c.elmo) L.push('pele_elmo', 'elmo');
     if (has('chifres')) L.push('chifres');
     return L.filter(function (l) { return have.indexOf(l) >= 0; });
   }
@@ -123,13 +97,21 @@
     const ctx = cv.getContext('2d'), F = man.frame, cols = man.cols, sx = (fi % cols) * F, sy = Math.floor(fi / cols) * F, sc = cv.width / F;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, cv.width, cv.height);
-    layersFor(c).forEach(function (l) { const im = layerImg(c, l); if (im && (im.width || im.naturalWidth) && (im.complete !== false)) ctx.drawImage(im, sx, sy, F, F, 0, 0, F * sc, F * sc); });
+    layersFor(c).forEach(function (l) { const im = layerImg(c, l); if (im.complete && im.naturalWidth) ctx.drawImage(im, sx, sy, F, F, 0, 0, F * sc, F * sc); });
   }
-  function draw(cv, cfg, anim, dir, t) {
+  function draw(cv, cfg, anim, dir, t, repeat) {
     if (!man) { loadMan(); return false; }
     const c = norm(cfg), key = animKey(c, anim || 'Idle', dir || 'DL'), a = man.anims[key];
+    if (repeat && a && a[2] !== 'loop') t = (t || 0) % (total(key) + 700);   // revisão: repete com uma pausa no fim
     blit(cv, c, frameAt(key, t || 0, !a || a[2] === 'loop'));
     return true;
+  }
+  /* quadro i de uma animação (para folhas de revisão) */
+  function frameCount(cfg, anim, dir) { if (!man) return 0; const a = man.anims[animKey(norm(cfg), anim, dir)]; return a ? a[1] : 0; }
+  function drawIndex(cv, cfg, anim, dir, i) {
+    if (!man) return false;
+    const c = norm(cfg), a = man.anims[animKey(c, anim, dir)]; if (!a) return false;
+    blit(cv, c, a[0] + Math.min(i, a[1] - 1)); return true;
   }
   function tick(now) {
     requestAnimationFrame(tick);
@@ -150,13 +132,20 @@
   requestAnimationFrame(tick);
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
-  const SW0 = { pele: 'f4be92', cabelo: '6c4532' };
   function chips(key, opts, val) {
     return '<div class="chips wrap" role="group">' + opts.map(function (o) {
-      const sw = SW0[key] ? '<i class="tac-sw" style="background:#' + (o[2] ? o[2][3] : SW0[key]) + '"></i>' : '';
-      return '<button type="button" class="chip" data-tac-set="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (String(val) === String(o[0])) + '">' + sw + esc(o[1]) + '</button>';
+      return '<button type="button" class="chip" data-tac-set="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (String(val) === String(o[0])) + '">' + esc(o[1]) + '</button>';
     }).join('') + '</div>';
   }
+  /* cores: só bolinhas (o nome da escolhida aparece no título do grupo) */
+  const SW0 = { pele: 'f4be92', cabelo: '6c4532' };
+  function swatches(key, opts, val) {
+    return '<div class="tac-sws" role="group">' + opts.map(function (o) {
+      const col = o[2] ? o[2][3] : SW0[key];
+      return '<button type="button" class="tac-swb" data-tac-set="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (val === o[0]) + '" aria-label="' + esc(o[1]) + '" title="' + esc(o[1]) + '" style="--sw:#' + col + '"></button>';
+    }).join('') + '</div>';
+  }
+  function nameOf(opts, v) { const o = opts.filter(function (x) { return x[0] === v; })[0]; return o ? o[1] : ''; }
   /* editor em janela: trabalha num rascunho; só grava ao Salvar */
   function open(cfg, onSave) {
     if (document.querySelector('.tac-ov')) return;
@@ -164,25 +153,31 @@
     prev.dir = 'DL'; prev.shot = null; prev.t0 = performance.now();
     const ov = document.createElement('div');
     ov.className = 'pfit tac-ov';
-    ov.innerHTML = '<div class="pfit-in tac-in" role="dialog" aria-modal="true" aria-label="Editar miniatura"><h3>Editar miniatura</h3>' +
-      '<p class="hint">É assim que o personagem aparece no mapa tático.</p>' +
-      '<div class="tac-wrap"><div class="tac-stage"><canvas class="tac" width="256" height="256" data-tac="' + esc(JSON.stringify(c)) + '" aria-label="Miniatura animada do personagem"></canvas>' +
-      '<div class="tac-dir"><button type="button" class="chip" data-tac-rot="-1" aria-label="Girar para a esquerda">⟲</button><button type="button" class="chip" data-tac-rot="1" aria-label="Girar para a direita">⟳</button></div></div>' +
+    ov.innerHTML = '<div class="pfit-in tac-in" role="dialog" aria-modal="true" aria-labelledby="tac-h">' +
+      '<div class="tac-hd"><h3 id="tac-h">Editar miniatura</h3><p class="hint">É assim que o personagem aparece no mapa tático.</p></div>' +
+      '<div class="tac-bd"><div class="tac-wrap">' +
+      '<div class="tac-stage"><canvas class="tac" width="320" height="320" data-tac="' + esc(JSON.stringify(c)) + '" aria-label="Miniatura animada do personagem"></canvas>' +
+      '<div class="tac-dir"><button type="button" class="chip" data-tac-rot="-1" aria-label="Girar para a esquerda">⟲</button><span class="tac-dl">Girar</span><button type="button" class="chip" data-tac-rot="1" aria-label="Girar para a direita">⟳</button></div></div>' +
       '<div class="tac-opts">' +
       '<div class="grp"><label>Corpo</label>' + chips('set', SETS, c.set) + '</div>' +
       '<div class="grp"><label>Raça</label>' + chips('raca', RACAS, c.raca) + '</div>' +
-      '<div class="grp"><label>Pele</label>' + chips('pele', PELES, c.pele) + '</div>' +
-      '<div class="grp"><label>Cabelo</label>' + chips('cabelo', CABELOS, c.cabelo) + '</div>' +
+      '<div class="grp"><label>Pele <b class="tac-nm" data-nm="pele">' + esc(nameOf(PELES, c.pele)) + '</b></label>' + swatches('pele', PELES, c.pele) + '</div>' +
+      '<div class="grp"><label>Cabelo <b class="tac-nm" data-nm="cabelo">' + esc(nameOf(CABELOS, c.cabelo)) + '</b></label>' + swatches('cabelo', CABELOS, c.cabelo) + '</div>' +
       '<div class="grp"><label>Elmo</label>' + chips('elmo', [['false', 'Sem elmo'], ['true', 'Com elmo']], c.elmo) + '</div>' +
       '<div class="grp"><label>Arma</label>' + chips('arma', ARMAS, c.arma) + '</div>' +
       '<p class="hint">Por enquanto só existe a armadura de guerreiro. Cabelos, roupas e chapéus novos vão aparecendo aqui.</p>' +
-      '</div></div>' +
-      '<div class="pfit-b"><span class="sp"></span><button type="button" class="btn q sm" data-tac-x="cancel">Cancelar</button><button type="button" class="btn sm" data-tac-x="ok">Salvar</button></div></div>';
+      '</div></div></div>' +
+      '<div class="tac-ft"><button type="button" class="btn q sm" data-tac-x="cancel">Cancelar</button><button type="button" class="btn sm" data-tac-x="ok">Salvar</button></div></div>';
     document.body.appendChild(ov);
     const cv = ov.querySelector('canvas');
     function close() { ov.remove(); document.removeEventListener('keydown', key); }
     function key(e) { if (e.key === 'Escape') close(); }
     document.addEventListener('keydown', key);
+    function mark(k) {
+      ov.querySelectorAll('[data-tac-set="' + k + '"]').forEach(function (y) { y.setAttribute('aria-pressed', String(y.dataset.v === String(c[k]))); });
+      const nm = ov.querySelector('[data-nm="' + k + '"]');
+      if (nm) nm.textContent = nameOf(k === 'pele' ? PELES : CABELOS, c[k]);
+    }
     ov.addEventListener('click', function (e) {
       if (e.target === ov) { close(); return; }
       const x = e.target.closest('[data-tac-x]');
@@ -194,15 +189,14 @@
       const k = b.dataset.tacSet, v = b.dataset.v;
       c[k] = k === 'elmo' ? v === 'true' : v;
       if (k === 'raca') {   // a raça sugere a pele dela (dá para trocar depois)
-        const r = RACAS.filter(function (x) { return x[0] === v; })[0];
-        const sug = r && r[3] ? r[3] : (['verde', 'cinza', 'vermelha', 'roxa', 'azulada'].indexOf(c.pele) >= 0 ? 'clara' : c.pele);
-        c.pele = sug;
-        ov.querySelectorAll('[data-tac-set="pele"]').forEach(function (y) { y.setAttribute('aria-pressed', String(y.dataset.v === c.pele)); });
+        const rr = RACAS.filter(function (x) { return x[0] === v; })[0];
+        c.pele = rr && rr[3] ? rr[3] : (['verde', 'cinza', 'vermelha', 'roxa', 'azulada'].indexOf(c.pele) >= 0 ? 'clara' : c.pele);
+        mark('pele');
       }
       cv.dataset.tac = JSON.stringify(c);
-      ov.querySelectorAll('[data-tac-set="' + k + '"]').forEach(function (y) { y.setAttribute('aria-pressed', String(y === b)); });
+      mark(k);
       if (k === 'arma' && v !== 'nenhuma') { prev.shot = 'Attack'; prev.t0 = performance.now(); }   // a arma só aparece no golpe: mostra um
     });
   }
-  window.HTTac = { open: open, norm: norm, draw: draw, load: loadMan, dirs: DIRS };
+  window.HTTac = { open: open, norm: norm, draw: draw, drawIndex: drawIndex, frameCount: frameCount, load: loadMan, dirs: DIRS, opts: { sets: SETS, racas: RACAS, peles: PELES, cabelos: CABELOS, armas: ARMAS } };
 })();
