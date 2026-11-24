@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '8';
+  const VER = '9';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
@@ -28,7 +28,7 @@
   ];
   /* raças: camadas extras e a pele sugerida ao escolher */
   const RACAS = [
-    ['humano', 'Humano', [], null], ['elfo', 'Elfo', ['orelha_elfo'], null], ['meio-elfo', 'Meio-elfo', ['orelha_orc'], null],
+    ['humano', 'Humano', [], null], ['elfo', 'Elfo', ['orelha_elfo'], null], ['meio-elfo', 'Meio-elfo', ['orelha_elfo'], null],
     ['orc', 'Orc', ['orelha_orc', 'presas'], 'verde'], ['meio-orc', 'Meio-orc', ['presas'], 'cinza'], ['tiefling', 'Tiefling', ['chifres'], 'vermelha']
   ];
   const DEF = { set: 'guerreira', raca: 'humano', elmo: false, arma: 'espada', pele: 'clara', cabelo: 'castanho' };
