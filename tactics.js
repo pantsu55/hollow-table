@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '7';
+  const VER = '8';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
@@ -53,8 +53,10 @@
     return manP;
   }
   /* pele e cabelo: as variações vêm prontas do servidor (camada~opção.png), feitas e revisadas antes de publicar */
-  const SKIN_L = { corpo: 1, pele_elmo: 1, orelha_elfo: 1, orelha_orc: 1, orelha_elfo_b: 1, orelha_orc_b: 1 };
+  const SKIN_L = { corpo: 1, pele_elmo: 1, orelha_elfo: 1, orelha_orc: 1, orelha_elfo_elmo: 1, orelha_orc_elmo: 1, roupa_pele: 1, cabelo_pele: 1, cabelo_elmo_pele: 1 };
+  ['espada', 'machado', 'maca', 'cajado', 'arco', 'besta', 'pistola'].forEach(function (w) { SKIN_L[w + '_pele'] = 1; });   // mão desenhada junto com a arma
   const HAIR_L = { cabelo: 1, cabelo_elmo: 1 };
+  ['espada', 'machado', 'maca', 'cajado', 'arco', 'besta', 'pistola'].forEach(function (w) { HAIR_L[w + '_cabelo'] = 1; });   // cabelo desenhado junto com a arma
   function img(set, name) {
     const k = set + '/' + name;
     if (!imgs[k]) {
@@ -76,13 +78,14 @@
     const has = function (x) { return ex.indexOf(x) >= 0; };
     const L = ['corpo'];
     if (has('presas')) L.push('presas');
-    L.push('roupa');
-    ex.forEach(function (x) { if (x.indexOf('orelha_') === 0) L.push(x + '_b'); });   // de costas: orelha por baixo do cabelo
-    L.push(c.elmo ? 'cabelo_elmo' : 'cabelo');
-    ex.forEach(function (x) { if (x.indexOf('orelha_') === 0) L.push(x); });          // de frente: por cima
-    if (c.arma !== 'nenhuma') L.push(c.arma);
-    if (c.elmo) L.push('pele_elmo', 'elmo');
-    if (has('chifres')) L.push('chifres');
+    L.push('roupa', 'roupa_pele');                    // *_pele: pele que estava desenhada na camada de cima (troca com a pele)
+    const hair = c.elmo ? 'cabelo_elmo' : 'cabelo';
+    L.push(hair, hair + '_pele');
+    const ears = ex.filter(function (x) { return x.indexOf('orelha_') === 0; });
+    if (!c.elmo) ears.forEach(function (x) { L.push(x); });
+    if (c.arma !== 'nenhuma') L.push(c.arma, c.arma + '_pele', c.arma + '_cabelo');
+    if (c.elmo) { L.push('pele_elmo', 'elmo'); ears.forEach(function (x) { L.push(x + '_elmo'); }); }   // com elmo: orelha por fora dele
+    if (has('chifres')) L.push(c.elmo ? 'chifres_elmo' : 'chifres');
     return L.filter(function (l) { return have.indexOf(l) >= 0; });
   }
   function total(key) { const a = man.anims[key]; let s = 0; if (a) for (let i = 0; i < a[1]; i++) s += man.durations[a[0] + i]; return s; }
