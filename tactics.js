@@ -1,26 +1,27 @@
 /* Hollow Table · miniatura tática (sprite em camadas, estilo FFT)
    Carrega sprites/tactics/manifest.json e as camadas PNG; desenha qualquer <canvas data-tac='{"set":…}'> que estiver na página.
-   Config salva na ficha (SH.tac): { set: 'guerreira'|'guerreiro', elmo: bool, arma: 'nenhuma'|'espada'|… } */
+   Config salva na ficha (SH.tac): { set: 'guerreira'|'guerreiro', elmo: bool, arma: 'nenhuma'|'espada'|… }
+   Uso: HTTac.open(cfg, onSave)  -> abre o editor (janela por cima da ficha)
+        HTTac.draw(canvas, cfg, anim, dir, t) -> desenha um quadro (para o mapa tático) */
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '1';
+  const VER = '2';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
-  const ANIMS = [['Idle', 'Parado'], ['Walk', 'Andando'], ['Attack', 'Ataque'], ['Cast', 'Magia'], ['Raise', 'Item'], ['Guard', 'Defesa'], ['Hurt', 'Dano'], ['KO', 'Caído']];
   const DIRS = ['DL', 'DR', 'UR', 'UL'];   // sentido horário visto de cima
   const DEF = { set: 'guerreira', elmo: false, arma: 'espada' };
   let man = null, manP = null;
   const imgs = {};
-  const prev = { anim: 'Idle', dir: 'DL', t0: performance.now() };
+  /* prévia do editor: Idle; ao escolher uma arma, um golpe e volta ao Idle */
+  const prev = { dir: 'DL', shot: null, t0: performance.now() };
 
   function norm(c) {
     c = Object.assign({}, DEF, c || {});
     if (!SETS.some(function (s) { return s[0] === c.set; })) c.set = DEF.set;
     if (!ARMAS.some(function (a) { return a[0] === c.arma; })) c.arma = DEF.arma;
-    c.elmo = !!c.elmo;
-    return c;
+    return { set: c.set, elmo: !!c.elmo, arma: c.arma };
   }
   function loadMan() {
     if (!manP) manP = fetch(BASE + 'manifest.json?v=' + VER).then(function (r) { return r.json(); }).then(function (m) { man = m; return m; }).catch(function () { manP = null; });
@@ -38,31 +39,25 @@
     if (c.elmo) L.push('elmo');
     return L.filter(function (l) { return have.indexOf(l) >= 0; });
   }
-  /* quadro da animação no instante t (ms); as de uma vez só repetem com uma pausa no fim */
-  function frameAt(key, t) {
+  function total(key) { const a = man.anims[key]; let s = 0; if (a) for (let i = 0; i < a[1]; i++) s += man.durations[a[0] + i]; return s; }
+  function frameAt(key, t, loop) {
     const a = man.anims[key]; if (!a) return 0;
-    const s = a[0], n = a[1], once = a[2] === 'once';
-    let total = 0; for (let i = 0; i < n; i++) total += man.durations[s + i];
-    const cyc = total + (once ? 700 : 0);
-    let tt = t % cyc;
-    for (let i = 0; i < n; i++) { tt -= man.durations[s + i]; if (tt < 0) return s + i; }
-    return s + n - 1;
+    let tt = loop ? t % total(key) : Math.max(0, t);
+    for (let i = 0; i < a[1]; i++) { tt -= man.durations[a[0] + i]; if (tt < 0) return a[0] + i; }
+    return a[0] + a[1] - 1;
   }
-  function draw(cv, c, key, t) {
-    const ctx = cv.getContext('2d'), F = man.frame, cols = man.cols;
-    const fi = frameAt(key, t), sx = (fi % cols) * F, sy = Math.floor(fi / cols) * F;
-    const scale = cv.width / F;
+  function animKey(c, anim, dir) { return (anim === 'Attack' && RANGED[c.arma] ? 'Shoot' : anim) + '_' + dir; }
+  function blit(cv, c, fi) {
+    const ctx = cv.getContext('2d'), F = man.frame, cols = man.cols, sx = (fi % cols) * F, sy = Math.floor(fi / cols) * F, sc = cv.width / F;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, cv.width, cv.height);
-    layersFor(c).forEach(function (l) {
-      const im = img(c.set, l);
-      if (im.complete && im.naturalWidth) ctx.drawImage(im, sx, sy, F, F, 0, 0, F * scale, F * scale);
-    });
+    layersFor(c).forEach(function (l) { const im = img(c.set, l); if (im.complete && im.naturalWidth) ctx.drawImage(im, sx, sy, F, F, 0, 0, F * sc, F * sc); });
   }
-  function animKey(c, anim, dir) {
-    let a = anim;
-    if (a === 'Attack' && RANGED[c.arma]) a = 'Shoot';
-    return a + '_' + dir;
+  function draw(cv, cfg, anim, dir, t) {
+    if (!man) { loadMan(); return false; }
+    const c = norm(cfg), key = animKey(c, anim || 'Idle', dir || 'DL'), a = man.anims[key];
+    blit(cv, c, frameAt(key, t || 0, !a || a[2] === 'loop'));
+    return true;
   }
   function tick(now) {
     requestAnimationFrame(tick);
@@ -71,57 +66,60 @@
     if (!man) { loadMan(); return; }
     list.forEach(function (cv) {
       let c; try { c = norm(JSON.parse(cv.dataset.tac)); } catch (e) { c = norm(null); }
-      const anim = cv.dataset.anim || prev.anim, dir = cv.dataset.dir || prev.dir;
-      draw(cv, c, animKey(c, anim, dir), now - prev.t0);
+      const t = now - prev.t0;
+      if (prev.shot) {
+        const k = animKey(c, prev.shot, prev.dir);
+        if (t < total(k) + 250) { blit(cv, c, frameAt(k, t, false)); return; }
+        prev.shot = null; prev.t0 = now;
+      }
+      blit(cv, c, frameAt('Idle_' + prev.dir, t, true));
     });
   }
   requestAnimationFrame(tick);
 
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
-  function chips(key, opts, val, ro) {
+  function chips(key, opts, val) {
     return '<div class="chips wrap" role="group">' + opts.map(function (o) {
-      return '<button type="button" class="chip" data-tac-set="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (String(val) === String(o[0])) + '"' + (ro ? ' disabled' : '') + '>' + esc(o[1]) + '</button>';
+      return '<button type="button" class="chip" data-tac-set="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (String(val) === String(o[0])) + '">' + esc(o[1]) + '</button>';
     }).join('') + '</div>';
   }
-  /* o cartão da ficha: prévia animada + escolhas (ro = só leitura) */
-  function card(cfg, ro) {
+  /* editor em janela: trabalha num rascunho; só grava ao Salvar */
+  function open(cfg, onSave) {
+    if (document.querySelector('.tac-ov')) return;
     const c = norm(cfg);
-    return '<div class="card tacc"><h2>Miniatura do grid</h2>' +
+    prev.dir = 'DL'; prev.shot = null; prev.t0 = performance.now();
+    const ov = document.createElement('div');
+    ov.className = 'pfit tac-ov';
+    ov.innerHTML = '<div class="pfit-in tac-in" role="dialog" aria-modal="true" aria-label="Editar miniatura"><h3>Editar miniatura</h3>' +
+      '<p class="hint">É assim que o personagem aparece no mapa tático.</p>' +
       '<div class="tac-wrap"><div class="tac-stage"><canvas class="tac" width="256" height="256" data-tac="' + esc(JSON.stringify(c)) + '" aria-label="Miniatura animada do personagem"></canvas>' +
       '<div class="tac-dir"><button type="button" class="chip" data-tac-rot="-1" aria-label="Girar para a esquerda">⟲</button><button type="button" class="chip" data-tac-rot="1" aria-label="Girar para a direita">⟳</button></div></div>' +
       '<div class="tac-opts">' +
-      '<div class="grp"><label>Prévia</label>' + chips('anim', ANIMS, prev.anim, false) + '</div>' +
-      '<div class="grp"><label>Corpo</label>' + chips('set', SETS, c.set, ro) + '</div>' +
-      '<div class="grp"><label>Elmo</label>' + chips('elmo', [['false', 'Sem elmo'], ['true', 'Com elmo']], c.elmo, ro) + '</div>' +
-      '<div class="grp"><label>Arma</label>' + chips('arma', ARMAS, c.arma, ro) + '</div>' +
-      '<p class="hint-s">Por enquanto só existe a armadura de guerreiro. Cabelos, roupas e chapéus novos vão aparecendo aqui.</p>' +
-      '</div></div></div>';
+      '<div class="grp"><label>Corpo</label>' + chips('set', SETS, c.set) + '</div>' +
+      '<div class="grp"><label>Elmo</label>' + chips('elmo', [['false', 'Sem elmo'], ['true', 'Com elmo']], c.elmo) + '</div>' +
+      '<div class="grp"><label>Arma</label>' + chips('arma', ARMAS, c.arma) + '</div>' +
+      '<p class="hint">Por enquanto só existe a armadura de guerreiro. Cabelos, roupas e chapéus novos vão aparecendo aqui.</p>' +
+      '</div></div>' +
+      '<div class="pfit-b"><span class="sp"></span><button type="button" class="btn q sm" data-tac-x="cancel">Cancelar</button><button type="button" class="btn sm" data-tac-x="ok">Salvar</button></div></div>';
+    document.body.appendChild(ov);
+    const cv = ov.querySelector('canvas');
+    function close() { ov.remove(); document.removeEventListener('keydown', key); }
+    function key(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', key);
+    ov.addEventListener('click', function (e) {
+      if (e.target === ov) { close(); return; }
+      const x = e.target.closest('[data-tac-x]');
+      if (x) { if (x.dataset.tacX === 'ok' && onSave) onSave(norm(c)); close(); return; }
+      const r = e.target.closest('[data-tac-rot]');
+      if (r) { const i = DIRS.indexOf(prev.dir); prev.dir = DIRS[(i + Number(r.dataset.tacRot) + 4) % 4]; return; }
+      const b = e.target.closest('[data-tac-set]');
+      if (!b) return;
+      const k = b.dataset.tacSet, v = b.dataset.v;
+      c[k] = k === 'elmo' ? v === 'true' : v;
+      cv.dataset.tac = JSON.stringify(c);
+      ov.querySelectorAll('[data-tac-set="' + k + '"]').forEach(function (y) { y.setAttribute('aria-pressed', String(y === b)); });
+      if (k === 'arma' && v !== 'nenhuma') { prev.shot = 'Attack'; prev.t0 = performance.now(); }   // a arma só aparece no golpe: mostra um
+    });
   }
-  /* cliques da prévia (não salvam nada); os que mudam a ficha vão para onChange */
-  let onChange = null;
-  document.addEventListener('click', function (e) {
-    const r = e.target.closest('[data-tac-rot]');
-    if (r) { const i = DIRS.indexOf(prev.dir); prev.dir = DIRS[(i + Number(r.dataset.tacRot) + 4) % 4]; prev.t0 = performance.now(); return; }
-    const b = e.target.closest('[data-tac-set]');
-    if (!b || b.disabled) return;
-    const k = b.dataset.tacSet, v = b.dataset.v;
-    const box = b.closest('.tacc');
-    if (k === 'anim') {
-      prev.anim = v; prev.t0 = performance.now();
-      if (box) box.querySelectorAll('[data-tac-set="anim"]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-      return;
-    }
-    const cv = box && box.querySelector('canvas[data-tac]');
-    let c; try { c = norm(JSON.parse(cv.dataset.tac)); } catch (err) { c = norm(null); }
-    c[k] = k === 'elmo' ? v === 'true' : v;
-    if (k === 'arma' && v !== 'nenhuma' && (prev.anim === 'Idle' || prev.anim === 'Walk')) prev.anim = 'Attack';   // mostra a arma na hora
-    prev.t0 = performance.now();
-    if (cv) cv.dataset.tac = JSON.stringify(c);
-    if (box) {
-      box.querySelectorAll('[data-tac-set="' + k + '"]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-      box.querySelectorAll('[data-tac-set="anim"]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.v === prev.anim)); });
-    }
-    if (onChange) onChange(c);
-  });
-  window.HTTac = { card: card, norm: norm, onChange: function (fn) { onChange = fn; }, load: loadMan };
+  window.HTTac = { open: open, norm: norm, draw: draw, load: loadMan, dirs: DIRS };
 })();
