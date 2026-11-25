@@ -6,7 +6,7 @@
 (function () {
   'use strict';
   const BASE = 'sprites/tactics/';
-  const VER = '9';
+  const VER = '10';
   const SETS = [['guerreira', 'Feminino'], ['guerreiro', 'Masculino']];
   const ARMAS = [['nenhuma', 'Nenhuma'], ['espada', 'Espada'], ['machado', 'Machado'], ['maca', 'Maça'], ['cajado', 'Cajado'], ['arco', 'Arco'], ['besta', 'Besta'], ['pistola', 'Pistola']];
   const RANGED = { arco: 1, besta: 1, pistola: 1 };
@@ -53,7 +53,7 @@
     return manP;
   }
   /* pele e cabelo: as variações vêm prontas do servidor (camada~opção.png), feitas e revisadas antes de publicar */
-  const SKIN_L = { corpo: 1, pele_elmo: 1, orelha_elfo: 1, orelha_orc: 1, orelha_elfo_elmo: 1, orelha_orc_elmo: 1, roupa_pele: 1, cabelo_pele: 1, cabelo_elmo_pele: 1 };
+  const SKIN_L = { corpo: 1, mao: 1, pele_elmo: 1, orelha_elfo: 1, orelha_orc: 1, orelha_elfo_elmo: 1, orelha_orc_elmo: 1, roupa_pele: 1, cabelo_pele: 1, cabelo_elmo_pele: 1 };
   ['espada', 'machado', 'maca', 'cajado', 'arco', 'besta', 'pistola'].forEach(function (w) { SKIN_L[w + '_pele'] = 1; });   // mão desenhada junto com a arma
   const HAIR_L = { cabelo: 1, cabelo_elmo: 1 };
   ['espada', 'machado', 'maca', 'cajado', 'arco', 'besta', 'pistola'].forEach(function (w) { HAIR_L[w + '_cabelo'] = 1; });   // cabelo desenhado junto com a arma
@@ -84,6 +84,7 @@
     const ears = ex.filter(function (x) { return x.indexOf('orelha_') === 0; });
     if (!c.elmo) ears.forEach(function (x) { L.push(x); });
     if (c.arma !== 'nenhuma') L.push(c.arma, c.arma + '_pele', c.arma + '_cabelo');
+    else L.push('mao');                               // sem arma: a mão que segurava a arma (punho fechado)
     if (c.elmo) { L.push('pele_elmo', 'elmo'); ears.forEach(function (x) { L.push(x + '_elmo'); }); }   // com elmo: orelha por fora dele
     if (has('chifres')) L.push(c.elmo ? 'chifres_elmo' : 'chifres');
     return L.filter(function (l) { return have.indexOf(l) >= 0; });
