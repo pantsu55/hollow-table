@@ -33,8 +33,8 @@
   ];
   /* penteados por corpo ('' = o cabelo original de cada corpo) */
   const PENTS = {
-    guerreira: [['', 'Rabo de cavalo'], ['curto', 'Curto'], ['longo', 'Longo solto'], ['tranca', 'Trança'], ['hime', 'Hime cut'], ['hime2', 'Hime cut reto']],
-    guerreiro: [['', 'Clássico'], ['curto', 'Bagunçado'], ['longo', 'Longo solto'], ['coque', 'Coque']]
+    guerreira: [['', 'Rabo de cavalo']],   // penteados novos fora do ar até passarem na revisão
+    guerreiro: [['', 'Clássico']]
   };
   const DEF = { set: 'guerreira', raca: 'humano', elmo: false, arma: 'espada', pele: 'clara', cabelo: 'castanho', pent: '' };
   let man = null, manP = null;
@@ -173,7 +173,7 @@
       '<div class="grp"><label>Corpo</label>' + chips('set', SETS, c.set) + '</div>' +
       '<div class="grp"><label>Raça</label>' + chips('raca', RACAS, c.raca) + '</div>' +
       '<div class="grp"><label>Pele <b class="tac-nm" data-nm="pele">' + esc(nameOf(PELES, c.pele)) + '</b></label>' + swatches('pele', PELES, c.pele) + '</div>' +
-      '<div class="grp"><label>Penteado</label><div data-pents>' + chips('pent', PENTS[c.set], c.pent) + '</div></div>' +
+      '<div class="grp" hidden><label>Penteado</label><div data-pents>' + chips('pent', PENTS[c.set], c.pent) + '</div></div>' +
       '<div class="grp"><label>Cabelo <b class="tac-nm" data-nm="cabelo">' + esc(nameOf(CABELOS, c.cabelo)) + '</b></label>' + swatches('cabelo', CABELOS, c.cabelo) + '</div>' +
       '<div class="grp"><label>Elmo</label>' + chips('elmo', [['false', 'Sem elmo'], ['true', 'Com elmo']], c.elmo) + '</div>' +
       '<div class="grp"><label>Arma</label>' + chips('arma', ARMAS, c.arma) + '</div>' +
