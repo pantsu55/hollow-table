@@ -92,7 +92,7 @@
     if (!c.elmo) ears.forEach(function (x) { L.push(x); });
     if (c.arma !== 'nenhuma') { L.push(c.arma, c.arma + '_pele'); if (!c.pent) L.push(c.arma + '_cabelo'); }
     else L.push('mao');                               // sem arma: a mão que segurava a arma (punho fechado)
-    if (c.elmo) { L.push('pele_elmo', 'elmo'); ears.forEach(function (x) { L.push(x + '_elmo' + (c.pent && have.indexOf(x + '_elmo_p') >= 0 ? '_p' : '')); }); }   // _p: orelha encostada no elmo (o rabo de cavalo não preenche mais o vão)   // com elmo: orelha por fora dele
+    if (c.elmo) { L.push('pele_elmo', 'elmo'); if (c.pent) L.push('elmo_p'); ears.forEach(function (x) { L.push(x + '_elmo' + (c.pent && have.indexOf(x + '_elmo_p') >= 0 ? '_p' : '')); }); }   // _p: orelha encostada no elmo (o rabo de cavalo não preenche mais o vão)   // com elmo: orelha por fora dele
     if (has('chifres')) L.push(c.elmo ? 'chifres_elmo' : 'chifres');
     return L.filter(function (l) { return have.indexOf(l) >= 0; });
   }
