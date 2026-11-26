@@ -31,7 +31,12 @@
     ['humano', 'Humano', [], null], ['elfo', 'Elfo', ['orelha_elfo'], null], ['meio-elfo', 'Meio-elfo', ['orelha_elfo'], null],
     ['orc', 'Orc', ['orelha_orc', 'presas'], 'verde'], ['meio-orc', 'Meio-orc', ['presas'], 'cinza'], ['tiefling', 'Tiefling', ['chifres'], 'vermelha']
   ];
-  const DEF = { set: 'guerreira', raca: 'humano', elmo: false, arma: 'espada', pele: 'clara', cabelo: 'castanho' };
+  /* penteados por corpo ('' = o cabelo original de cada corpo) */
+  const PENTS = {
+    guerreira: [['', 'Rabo de cavalo'], ['curto', 'Curto'], ['longo', 'Longo solto'], ['tranca', 'Trança'], ['hime', 'Hime cut'], ['hime2', 'Hime cut reto']],
+    guerreiro: [['', 'Clássico'], ['curto', 'Bagunçado'], ['longo', 'Longo solto'], ['coque', 'Coque']]
+  };
+  const DEF = { set: 'guerreira', raca: 'humano', elmo: false, arma: 'espada', pele: 'clara', cabelo: 'castanho', pent: '' };
   let man = null, manP = null;
   const imgs = {};
   /* prévia do editor: Idle; ao escolher uma arma, um golpe e volta ao Idle */
@@ -44,7 +49,8 @@
     if (!PELES.some(function (a) { return a[0] === c.pele; })) c.pele = DEF.pele;
     if (!CABELOS.some(function (a) { return a[0] === c.cabelo; })) c.cabelo = DEF.cabelo;
     if (!RACAS.some(function (a) { return a[0] === c.raca; })) c.raca = DEF.raca;
-    return { set: c.set, raca: c.raca, elmo: !!c.elmo, arma: c.arma, pele: c.pele, cabelo: c.cabelo };
+    if (!(PENTS[c.set] || []).some(function (a) { return a[0] === c.pent; })) c.pent = '';
+    return { set: c.set, raca: c.raca, elmo: !!c.elmo, arma: c.arma, pele: c.pele, cabelo: c.cabelo, pent: c.pent };
   }
   const INL = window.HTTAC_INLINE || null;   // página de revisão: manifest e imagens embutidos
   function loadMan() {
@@ -69,7 +75,7 @@
     const hs = (man.sets[c.set] || {}).hash || {};
     let v = null;
     if (SKIN_L[l] && c.pele !== 'clara') v = l + '~' + c.pele;
-    if (HAIR_L[l] && c.cabelo !== 'castanho') v = l + '~' + c.cabelo;
+    if ((HAIR_L[l] || (c.pent && l.indexOf('cabelo_' + c.pent) === 0)) && c.cabelo !== 'castanho') v = l + '~' + c.cabelo;
     return img(c.set, v && hs[v] ? v : l);
   }
   function layersFor(c) {
@@ -80,10 +86,11 @@
     if (has('presas')) L.push('presas');
     L.push('roupa', 'roupa_pele');                    // *_pele: pele que estava desenhada na camada de cima (troca com a pele)
     const hair = c.elmo ? 'cabelo_elmo' : 'cabelo';
-    L.push(hair, hair + '_pele', hair + '_fixo');   // _fixo: olho, prendedor e pedaços de roupa que estavam no cabelo (não mudam)
+    if (c.pent) L.push('cabelo_' + c.pent + (c.elmo ? '_elmo' : ''));   // penteado novo: uma camada só (com elmo, só o que sai por baixo dele)
+    else L.push(hair, hair + '_pele', hair + '_fixo');   // _fixo: olho, prendedor e pedaços de roupa que estavam no cabelo (não mudam)
     const ears = ex.filter(function (x) { return x.indexOf('orelha_') === 0; });
     if (!c.elmo) ears.forEach(function (x) { L.push(x); });
-    if (c.arma !== 'nenhuma') L.push(c.arma, c.arma + '_pele', c.arma + '_cabelo');
+    if (c.arma !== 'nenhuma') { L.push(c.arma, c.arma + '_pele'); if (!c.pent) L.push(c.arma + '_cabelo'); }
     else L.push('mao');                               // sem arma: a mão que segurava a arma (punho fechado)
     if (c.elmo) { L.push('pele_elmo', 'elmo'); ears.forEach(function (x) { L.push(x + '_elmo'); }); }   // com elmo: orelha por fora dele
     if (has('chifres')) L.push(c.elmo ? 'chifres_elmo' : 'chifres');
@@ -166,10 +173,11 @@
       '<div class="grp"><label>Corpo</label>' + chips('set', SETS, c.set) + '</div>' +
       '<div class="grp"><label>Raça</label>' + chips('raca', RACAS, c.raca) + '</div>' +
       '<div class="grp"><label>Pele <b class="tac-nm" data-nm="pele">' + esc(nameOf(PELES, c.pele)) + '</b></label>' + swatches('pele', PELES, c.pele) + '</div>' +
+      '<div class="grp"><label>Penteado</label><div data-pents>' + chips('pent', PENTS[c.set], c.pent) + '</div></div>' +
       '<div class="grp"><label>Cabelo <b class="tac-nm" data-nm="cabelo">' + esc(nameOf(CABELOS, c.cabelo)) + '</b></label>' + swatches('cabelo', CABELOS, c.cabelo) + '</div>' +
       '<div class="grp"><label>Elmo</label>' + chips('elmo', [['false', 'Sem elmo'], ['true', 'Com elmo']], c.elmo) + '</div>' +
       '<div class="grp"><label>Arma</label>' + chips('arma', ARMAS, c.arma) + '</div>' +
-      '<p class="hint">Por enquanto só existe a armadura de guerreiro. Cabelos, roupas e chapéus novos vão aparecendo aqui.</p>' +
+      '<p class="hint">Por enquanto só existe a armadura de guerreiro. Roupas e chapéus novos vão aparecendo aqui.</p>' +
       '</div></div></div>' +
       '<div class="tac-ft"><button type="button" class="btn q sm" data-tac-x="cancel">Cancelar</button><button type="button" class="btn sm" data-tac-x="ok">Salvar</button></div></div>';
     document.body.appendChild(ov);
@@ -197,10 +205,14 @@
         c.pele = rr && rr[3] ? rr[3] : (['verde', 'cinza', 'vermelha', 'roxa', 'azulada'].indexOf(c.pele) >= 0 ? 'clara' : c.pele);
         mark('pele');
       }
+      if (k === 'set') {   // cada corpo tem os seus penteados
+        if (!PENTS[c.set].some(function (a) { return a[0] === c.pent; })) c.pent = '';
+        ov.querySelector('[data-pents]').innerHTML = chips('pent', PENTS[c.set], c.pent);
+      }
       cv.dataset.tac = JSON.stringify(c);
       mark(k);
       if (k === 'arma' && v !== 'nenhuma') { prev.shot = 'Attack'; prev.t0 = performance.now(); }   // a arma só aparece no golpe: mostra um
     });
   }
-  window.HTTac = { open: open, norm: norm, draw: draw, drawIndex: drawIndex, frameCount: frameCount, load: loadMan, dirs: DIRS, opts: { sets: SETS, racas: RACAS, peles: PELES, cabelos: CABELOS, armas: ARMAS } };
+  window.HTTac = { open: open, norm: norm, draw: draw, drawIndex: drawIndex, frameCount: frameCount, load: loadMan, dirs: DIRS, opts: { sets: SETS, racas: RACAS, peles: PELES, cabelos: CABELOS, armas: ARMAS, pents: PENTS } };
 })();
